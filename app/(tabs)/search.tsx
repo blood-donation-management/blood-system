@@ -40,6 +40,9 @@ export default function SearchDonors() {
   const [pickerVisible, setPickerVisible] = useState<'city' | 'area' | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [selectedDonorToReport, setSelectedDonorToReport] = useState<Donor | null>(null);
 
   // Animation refs
   const searchButtonScale = useRef(new Animated.Value(1)).current;
@@ -265,6 +268,35 @@ export default function SearchDonors() {
     }
   };
 
+  const handleReportUser = (donor: Donor) => {
+    setSelectedDonorToReport(donor);
+    setReportReason('');
+    setReportModalVisible(true);
+  };
+
+  const submitReport = async () => {
+    if (!selectedDonorToReport) return;
+    
+    if (!reportReason || reportReason.trim().length < 10) {
+      Alert.alert('Error', 'Please provide a detailed reason (at least 10 characters)');
+      return;
+    }
+    
+    try {
+      await DonorService.reportUser(selectedDonorToReport.id, reportReason.trim());
+      setReportModalVisible(false);
+      setSelectedDonorToReport(null);
+      setReportReason('');
+      Alert.alert(
+        'Report Submitted',
+        'Thank you for your report. Our admin team will review it shortly.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to submit report');
+    }
+  };
+
   const renderDonor = ({ item }: { item: Donor }) => (
     <View style={styles.donorCard}>
       <View style={styles.donorCardGradient} />
@@ -375,6 +407,17 @@ export default function SearchDonors() {
           <MessageCircle size={16} color="#FFFFFF" />
           <Text style={styles.whatsappButtonText}>Message on WhatsApp</Text>
         </TouchableOpacity>
+        
+        {/* Report User Button */}
+        {!isAdmin && (
+          <TouchableOpacity 
+            style={styles.reportButton} 
+            onPress={() => handleReportUser(item)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.reportButtonText}>⚠️ Report User</Text>
+          </TouchableOpacity>
+        )}
         
         {/* Admin Controls */}
         {isAdmin && (
@@ -563,6 +606,71 @@ export default function SearchDonors() {
               </TouchableOpacity>
               <TouchableOpacity onPress={() => { setShowFilters(false); searchDonors(); }}>
                 <Text style={{ color: colors.primary[600], fontWeight: '700' }}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Report Modal */}
+      <Modal visible={reportModalVisible} transparent animationType="fade" onRequestClose={() => setReportModalVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20 }}>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 8 }}>Report User</Text>
+            <Text style={{ fontSize: 14, color: '#6B7280', marginBottom: 16 }}>
+              {selectedDonorToReport ? `Report ${selectedDonorToReport.name}` : 'Report User'}
+            </Text>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 }}>
+              Reason for reporting (min 10 characters):
+            </Text>
+            <TextInput
+              style={{
+                backgroundColor: '#F9FAFB',
+                borderWidth: 1,
+                borderColor: '#E5E7EB',
+                borderRadius: 8,
+                padding: 12,
+                fontSize: 14,
+                color: '#111827',
+                minHeight: 100,
+                textAlignVertical: 'top',
+                marginBottom: 16
+              }}
+              placeholder="Please provide detailed reason..."
+              placeholderTextColor="#9CA3AF"
+              value={reportReason}
+              onChangeText={setReportReason}
+              multiline
+              numberOfLines={4}
+            />
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setReportModalVisible(false);
+                  setSelectedDonorToReport(null);
+                  setReportReason('');
+                }}
+                style={{
+                  flex: 1,
+                  padding: 14,
+                  borderRadius: 8,
+                  backgroundColor: '#F3F4F6',
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: '#6B7280', fontWeight: '700', fontSize: 16 }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={submitReport}
+                style={{
+                  flex: 1,
+                  padding: 14,
+                  borderRadius: 8,
+                  backgroundColor: '#DC2626',
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 16 }}>Submit Report</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -978,6 +1086,23 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: fontSize.sm,
     fontWeight: '700',
+  },
+  reportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.sm,
+  },
+  reportButtonText: {
+    color: '#DC2626',
+    fontSize: fontSize.sm,
+    fontWeight: '600',
   },
   availabilityRow: {
     flexDirection: 'row',

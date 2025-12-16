@@ -22,6 +22,7 @@ interface BloodRequest {
   status: string;
   createdAt?: string;
   created_at?: string;
+  rejection_reason?: string;
   donorData?: {
     name: string;
     blood_group: string;
@@ -251,6 +252,14 @@ export default function NotificationsScreen() {
           </View>
         )}
 
+        {/* Display rejection reason if available */}
+        {item.status === 'rejected' && (item as any).rejection_reason && (
+          <View style={[styles.messageContainer, { backgroundColor: '#FEE2E2', borderLeftColor: '#DC2626' }]}>
+            <Text style={[styles.messageLabel, { color: '#DC2626' }]}>Rejection Reason:</Text>
+            <Text style={[styles.messageText, { color: '#991B1B' }]}>{(item as any).rejection_reason}</Text>
+          </View>
+        )}
+
         {/* Admin Action Buttons */}
         <View style={styles.actionButtons}>
           {item.status !== 'completed' && (
@@ -272,9 +281,13 @@ export default function NotificationsScreen() {
                   
                   // Update in state immediately
                   const itemId = (item as any).id || (item as any)._id;
-                  setNotifications(prev => 
-                    prev.map(n => ((n as any).id || (n as any)._id) === itemId ? { ...n, status: 'completed' } : n)
-                  );
+                  setNotifications(prev => {
+                    const updated = prev.map(n => ((n as any).id || (n as any)._id) === itemId ? { ...n, status: 'completed' } : n);
+                    // Update pending count
+                    const newPendingCount = updated.filter((r: any) => r.status === 'pending').length;
+                    setPendingCount(newPendingCount);
+                    return updated;
+                  });
                   
                   await AdminService.updateRequestStatus(itemId, 'completed');
                   Alert.alert('✓', 'Donation marked as completed');
@@ -309,9 +322,13 @@ export default function NotificationsScreen() {
                   if (!confirm) return;
                   
                   const itemId = (item as any).id || (item as any)._id;
-                  setNotifications(prev => 
-                    prev.map(n => ((n as any).id || (n as any)._id) === itemId ? { ...n, status: 'pending' } : n)
-                  );
+                  setNotifications(prev => {
+                    const updated = prev.map(n => ((n as any).id || (n as any)._id) === itemId ? { ...n, status: 'pending' } : n);
+                    // Update pending count
+                    const newPendingCount = updated.filter((r: any) => r.status === 'pending').length;
+                    setPendingCount(newPendingCount);
+                    return updated;
+                  });
                   
                   await AdminService.updateRequestStatus(itemId, 'pending');
                   Alert.alert('✓', 'Status reverted to pending');
@@ -344,9 +361,13 @@ export default function NotificationsScreen() {
                 if (!confirm) return;
                 
                 const itemId = (item as any).id || (item as any)._id;
-                setNotifications(prev => 
-                  prev.map(n => ((n as any).id || (n as any)._id) === itemId ? { ...n, status: 'rejected' } : n)
-                );
+                setNotifications(prev => {
+                  const updated = prev.map(n => ((n as any).id || (n as any)._id) === itemId ? { ...n, status: 'rejected' } : n);
+                  // Update pending count
+                  const newPendingCount = updated.filter((r: any) => r.status === 'pending').length;
+                  setPendingCount(newPendingCount);
+                  return updated;
+                });
                 
                 await AdminService.updateRequestStatus(itemId, 'rejected');
                 Alert.alert('✓', 'Request rejected');

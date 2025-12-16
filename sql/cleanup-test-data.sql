@@ -4,27 +4,22 @@
 -- This script removes test donors and their associated requests
 -- Run this to show only real-time notifications
 
--- Step 1: Delete test blood requests (older than 1 day or from test donors)
--- You can adjust the timeframe as needed
-DELETE FROM blood_requests
-WHERE created_at < NOW() - INTERVAL '1 day'
-  OR donor_id IN (
-    SELECT id FROM donors 
-    WHERE email LIKE '%test%' 
-       OR email LIKE '%example.com'
-       OR name LIKE 'Test %'
-  );
+-- Step 1: Delete ALL old blood requests (keeps the system fresh)
+-- This removes ALL existing requests so you see only new real-time ones
+DELETE FROM blood_requests;
 
--- Step 2: Delete test donors
+-- Step 2: Delete test donors (optional - comment out if you want to keep them)
 DELETE FROM donors
 WHERE email LIKE '%test%' 
    OR email LIKE '%example.com'
    OR name LIKE 'Test %'
    OR phone_number LIKE '017123450%'; -- Test phone numbers
 
--- Step 3: Keep only recent requests (optional - uncomment if needed)
--- DELETE FROM blood_requests
--- WHERE created_at < NOW() - INTERVAL '7 days';
+-- Step 3: Reset the system to show only fresh real-time data
+-- After running this script:
+-- - All old requests are deleted
+-- - New requests will show correct timestamps ("just now", "2 minutes ago", etc.)
+-- - Notification counts will be accurate
 
 -- Step 4: Verify remaining data
 SELECT 

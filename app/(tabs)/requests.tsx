@@ -18,6 +18,7 @@ interface BloodRequest {
   created_at: string;
   updated_at?: string;
   note?: string;
+  rejection_reason?: string;
   // Will fetch joined data from users/donors
   admin_name?: string;
   donor_name?: string;
@@ -158,10 +159,11 @@ export default function RequestsScreen() {
         </View>
       )}
 
-      {item.note && (item.status === 'rejected' || item.status === 'cancelled' || item.status === 'declined') && (
+      {/* Show rejection reason if available */}
+      {(item.rejection_reason || item.note) && (item.status === 'rejected' || item.status === 'cancelled' || item.status === 'declined') && (
         <View style={styles.noteContainer}>
           <Text style={styles.noteLabel}>{item.status === 'rejected' || item.status === 'declined' ? 'Rejection Reason' : 'Cancellation Reason'}:</Text>
-          <Text style={styles.noteText}>{item.note}</Text>
+          <Text style={styles.noteText}>{item.rejection_reason || item.note}</Text>
         </View>
       )}
 

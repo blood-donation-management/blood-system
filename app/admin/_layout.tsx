@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Shield, User, Users, Bell } from 'lucide-react-native';
+import { Shield, User, Users, Bell, AlertTriangle } from 'lucide-react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { View, Text, StyleSheet } from 'react-native';
 import { useState, useEffect } from 'react';
@@ -7,10 +7,15 @@ import { supabase } from '@/config/supabase';
 
 export default function AdminTabsLayout() {
   const [pendingCount, setPendingCount] = useState(0);
+  const [reportsCount, setReportsCount] = useState(0);
 
   useEffect(() => {
     fetchPendingCount();
-    const interval = setInterval(fetchPendingCount, 5000);
+    fetchReportsCount();
+    const interval = setInterval(() => {
+      fetchPendingCount();
+      fetchReportsCount();
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -23,6 +28,18 @@ export default function AdminTabsLayout() {
       setPendingCount(count || 0);
     } catch (error) {
       console.error('Failed to fetch pending count:', error);
+    }
+  };
+
+  const fetchReportsCount = async () => {
+    try {
+      const { count } = await supabase
+        .from('user_reports')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      setReportsCount(count || 0);
+    } catch (error) {
+      console.error('Failed to fetch reports count:', error);
     }
   };
 
@@ -91,6 +108,24 @@ export default function AdminTabsLayout() {
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>
                     {pendingCount > 99 ? '99+' : pendingCount}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="reports"
+        options={{
+          title: 'Reports',
+          tabBarIcon: ({ size, color }: { size: number; color: string }) => (
+            <View>
+              <AlertTriangle size={size + 2} color={color} strokeWidth={2.5} />
+              {reportsCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {reportsCount > 99 ? '99+' : reportsCount}
                   </Text>
                 </View>
               )}

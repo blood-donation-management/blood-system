@@ -167,10 +167,18 @@ export class DonorService {
 
   static async searchDonors(location?: string, bloodGroup?: string) {
     try {
+      // Get current user to exclude from results
+      const { data: { user } } = await supabase.auth.getUser();
+      
       let query = supabase
         .from('donors')
         .select('*')
         .eq('status', 'active');
+
+      // Exclude current user from search results
+      if (user) {
+        query = query.neq('id', user.id);
+      }
 
       if (location) {
         query = query.ilike('location', `%${location}%`);
@@ -260,15 +268,22 @@ export class DonorService {
       
       // Enrich with user names and details
       const enriched = await Promise.all((data || []).map(async (req) => {
-        const [adminData, donorData] = await Promise.all([
-          supabase.from('admins').select('name,email').eq('id', req.admin_id).maybeSingle(),
+        // Try to fetch from both admins and donors tables for requester (admin_id can be donor or admin)
+        const [adminData, requesterData, donorData] = await Promise.all([
+          supabase.from('admins').select('username as name,id').eq('id', req.admin_id).maybeSingle(),
+          supabase.from('donors').select('name,email,blood_group,phone_number').eq('id', req.admin_id).maybeSingle(),
           supabase.from('donors').select('name,email,blood_group,phone_number').eq('id', req.donor_id).maybeSingle()
         ]);
         
+        // Use requester name from donors table if not an admin
+        const requesterName = adminData.data?.name || requesterData.data?.name || requesterData.data?.email || 'Requester';
+        
         return {
           ...req,
-          admin_name: adminData.data?.name || adminData.data?.email,
+          admin_name: requesterName,
+          admin_email: requesterData.data?.email,
           donor_name: donorData.data?.name || donorData.data?.email,
+          donor_email: donorData.data?.email,
           blood_group: donorData.data?.blood_group,
           phone_number: donorData.data?.phone_number,
         };
@@ -280,7 +295,7 @@ export class DonorService {
     }
   }
 
-  static async rejectRequest(requestId: string, note?: string) {
+  static async rejectRequest(requestId: string, rejectionReason?: string) {
     try {
       if (!requestId || requestId === 'undefined') {
         throw new Error('Invalid request ID');
@@ -290,7 +305,7 @@ export class DonorService {
         .from('blood_requests')
         .update({ 
           status: 'rejected',
-          note: note,
+          rejection_reason: rejectionReason,
           updated_at: new Date().toISOString()
         })
         .eq('id', requestId)
@@ -385,6 +400,22 @@ export class DonorService {
 
       if (error) throw new Error('Failed to complete request: ' + error.message);
 
+      // Update donor's last_donation_date when request is completed
+      if (request.donor_id) {
+        const { error: donorError } = await supabase
+          .from('donors')
+          .update({ 
+            last_donation_date: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', request.donor_id);
+
+        if (donorError) {
+          console.error('Failed to update donor last donation date:', donorError);
+          // Don't throw error here to avoid blocking the completion
+        }
+      }
+
       // If rating is provided, update donor's rating statistics
       if (rating !== undefined && request.donor_id) {
         await this.updateDonorRating(request.donor_id, rating);
@@ -451,6 +482,34 @@ export class DonorService {
       return data || [];
     } catch (error: any) {
       throw new Error(error.message || 'Unable to fetch donation history. Please try again.');
+    }
+  }
+
+  static async reportUser(reportedUserId: string, reason: string, category?: string) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      if (!reason || reason.trim().length < 10) {
+        throw new Error('Please provide a detailed reason (at least 10 characters)');
+      }
+
+      const { data, error } = await supabase
+        .from('user_reports')
+        .insert({
+          reporter_id: user.id,
+          reported_user_id: reportedUserId,
+          reason: reason.trim(),
+          category: category || 'other',
+          status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (error) throw new Error('Failed to submit report: ' + error.message);
+      return data;
+    } catch (error: any) {
+      throw new Error(error.message || 'Unable to submit report. Please try again.');
     }
   }
 }

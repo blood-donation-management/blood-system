@@ -240,4 +240,63 @@ export class AdminService {
 
     return { success: true };
   }
+
+  // User Reports Management
+  static async getUserReports(status?: string) {
+    let query = supabase
+      .from('user_reports')
+      .select(`
+        *,
+        reporter:donors!user_reports_reporter_id_fkey(
+          name,
+          email,
+          phone_number
+        ),
+        reported_user:donors!user_reports_reported_user_id_fkey(
+          name,
+          email,
+          phone_number,
+          blood_group,
+          location
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
+    if (error) throw new Error('Failed to fetch reports: ' + error.message);
+    
+    return (data || []).map((report: any) => ({
+      ...report,
+      reporterName: report.reporter?.name || 'Unknown',
+      reporterEmail: report.reporter?.email || 'N/A',
+      reportedUserName: report.reported_user?.name || 'Unknown',
+      reportedUserEmail: report.reported_user?.email || 'N/A',
+      reportedUserBloodGroup: report.reported_user?.blood_group || 'N/A',
+      reportedUserLocation: report.reported_user?.location || 'N/A'
+    }));
+  }
+
+  static async updateReportStatus(reportId: string, status: 'pending' | 'reviewed' | 'resolved' | 'dismissed', adminNotes?: string) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Admin not authenticated');
+
+    const { data, error } = await supabase
+      .from('user_reports')
+      .update({ 
+        status,
+        admin_notes: adminNotes,
+        reviewed_by: user.id,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', reportId)
+      .select()
+      .single();
+
+    if (error) throw new Error('Failed to update report status: ' + error.message);
+    return data;
+  }
 }

@@ -181,13 +181,21 @@ export default function NotificationsScreen() {
               {formatDateTime(item.created_at || item.createdAt)}
             </Text>
             <Text style={[styles.notificationTime, { fontSize: 10, color: '#9CA3AF', marginTop: 2 }]}>
-              {new Date(item.created_at || item.createdAt || '').toLocaleString('en-BD', {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-              })}
+              {(() => {
+                try {
+                  const date = new Date(item.created_at || item.createdAt || '');
+                  return date.toLocaleString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                  });
+                } catch (e) {
+                  return 'Invalid date';
+                }
+              })()}
             </Text>
           </View>
         </View>

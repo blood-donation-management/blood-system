@@ -24,6 +24,7 @@ import { AuthService } from '@/services/AuthService';
 import { router } from 'expo-router';
 import { captureRef } from 'react-native-view-shot';
 import { fontSize, spacing, colors, shadows, borderRadius, moderateScale, hp, wp } from '@/utils/responsive';
+import { isValidBangladeshPhone } from '@/utils/validation';
 
 interface DonorProfile {
   id: string;
@@ -145,6 +146,14 @@ const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
   const saveProfile = async () => {
     if (!formData.name.trim() || !formData.location.trim() || !formData.phone_number.trim()) {
       Alert.alert('Error', 'Please fill in all required fields');
+      return;
+    }
+
+    if (!isValidBangladeshPhone(formData.phone_number)) {
+      Alert.alert(
+        'Invalid Phone Number',
+        'Please enter a valid 11-digit Bangladesh mobile number (e.g., 01712345678).\n\nValid operators: Grameenphone, Banglalink, Robi, Airtel, Teletalk'
+      );
       return;
     }
 

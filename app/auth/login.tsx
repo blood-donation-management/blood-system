@@ -225,15 +225,6 @@ export default function Login() {
               </TouchableOpacity>
             </Animated.View>
 
-            <TouchableOpacity
-              onPress={() => router.push('/auth/profile-recovery')}
-              style={styles.recoveryLink}
-            >
-              <Text style={styles.recoveryText}>
-                Having login issues? Fix Profile →
-              </Text>
-            </TouchableOpacity>
-
             <Animated.View
               style={[
                 styles.adminButton,

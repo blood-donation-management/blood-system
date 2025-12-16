@@ -55,12 +55,28 @@ export default function SearchDonors() {
   useEffect(() => {
     checkAdminStatus();
     searchDonors();
-    // Real-time refresh every 3 seconds
-    const interval = setInterval(() => {
-      searchDonors();
-    }, 3000);
-    return () => clearInterval(interval);
   }, []);
+
+  const calculateAvailability = (lastDonationDate: string | undefined) => {
+    if (!lastDonationDate) return { available: true, daysUntilEligible: 0, message: 'Available' };
+    
+    const lastDonation = new Date(lastDonationDate);
+    const now = new Date();
+    const diffMs = now.getTime() - lastDonation.getTime();
+    const daysSinceDonation = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const requiredWaitDays = 90; // 3 months
+    
+    if (daysSinceDonation >= requiredWaitDays) {
+      return { available: true, daysUntilEligible: 0, message: 'Available' };
+    } else {
+      const daysRemaining = requiredWaitDays - daysSinceDonation;
+      return { 
+        available: false, 
+        daysUntilEligible: daysRemaining,
+        message: `Available in ${daysRemaining} days`
+      };
+    }
+  };
 
   const checkAdminStatus = async () => {
     try {
@@ -198,6 +214,18 @@ export default function SearchDonors() {
         Alert.alert('Error', 'Invalid donor ID. Please try again.');
         return;
       }
+      
+      // Check donor availability before sending request
+      const availability = calculateAvailability(donor.lastDonationDate);
+      if (!availability.available) {
+        Alert.alert(
+          'Donor Not Available',
+          `This donor is not eligible to donate yet. They will be available in ${availability.daysUntilEligible} days (${Math.ceil(availability.daysUntilEligible / 30)} months after last donation).`,
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
       await DonorService.sendBloodRequest(donor.id);
       Alert.alert(
         'Request Sent',
@@ -249,11 +277,11 @@ export default function SearchDonors() {
           </View>
           {/* Rating row */}
           <View style={styles.ratingRow}>
-            <Star size={14} color={item.avgRating ? '#F59E0B' : '#9CA3AF'} fill={item.avgRating ? '#F59E0B' : 'none'} />
+            <Star size={14} color={item.avg_rating ? '#F59E0B' : '#9CA3AF'} fill={item.avg_rating ? '#F59E0B' : 'none'} />
             <Text style={styles.ratingText}>
-              {typeof item.avgRating === 'number' ? `${item.avgRating.toFixed(1)} / 5` : 'No ratings yet'}
+              {typeof item.avg_rating === 'number' ? `${item.avg_rating.toFixed(1)} / 5` : 'No ratings yet'}
               {` `}
-              {typeof item.ratingCount === 'number' && item.ratingCount > 0 ? `(${item.ratingCount})` : ''}
+              {typeof item.rating_count === 'number' && item.rating_count > 0 ? `(${item.rating_count})` : ''}
             </Text>
           </View>
           {/* Availability status - show eligibility with days since last donation */}
@@ -266,7 +294,7 @@ export default function SearchDonors() {
             ) : item.eligible === false ? (
               <>
                 <CheckCircle size={14} color="#F59E0B" />
-                <Text style={styles.eligibleText}>Can donate in {item.daysUntilEligible} days</Text>
+                <Text style={styles.eligibleText}>Can donate in {item.days_until_eligible} days</Text>
               </>
             ) : (
               <>
@@ -282,9 +310,14 @@ export default function SearchDonors() {
           }}
         >
           <TouchableOpacity
-            style={[styles.requestButton, styles.classyRequestButton]}
+            style={[
+              styles.requestButton, 
+              styles.classyRequestButton,
+              !calculateAvailability(item.lastDonationDate).available && styles.disabledRequestButton
+            ]}
             onPress={() => handleRequestPress(item)}
             activeOpacity={0.8}
+            disabled={!calculateAvailability(item.lastDonationDate).available}
           >
             <View style={styles.requestButtonGlow} />
             <View style={[styles.requestButtonInner, styles.classyRequestInner]}>
@@ -300,14 +333,24 @@ export default function SearchDonors() {
           <MapPin size={14} color="#6B7280" />
           <Text style={styles.detailText}>{item.location}</Text>
         </View>
-        {item.lastDonationDate && (
-          <View style={styles.detailRow}>
-            <Droplet size={14} color="#DC2626" />
-            <Text style={styles.detailText}>
-              Last donated: {new Date(item.lastDonationDate).toLocaleDateString()}
-            </Text>
-          </View>
-        )}
+        {(() => {
+          const availability = calculateAvailability(item.lastDonationDate);
+          return (
+            <View style={styles.availabilityRow}>
+              <View style={[styles.availabilityBadge, availability.available ? styles.availableBadge : styles.unavailableBadge]}>
+                <View style={[styles.availabilityDot, { backgroundColor: availability.available ? '#10B981' : '#F59E0B' }]} />
+                <Text style={[styles.availabilityText, { color: availability.available ? '#10B981' : '#F59E0B' }]}>
+                  {availability.message}
+                </Text>
+              </View>
+              {item.lastDonationDate && (
+                <Text style={styles.lastDonationText}>
+                  Last: {new Date(item.lastDonationDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </Text>
+              )}
+            </View>
+          );
+        })()}
         <View style={[styles.detailRow, { justifyContent: 'space-between', alignItems: 'center' }]}>
           <TouchableOpacity 
             style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
@@ -935,6 +978,45 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: fontSize.sm,
     fontWeight: '700',
+  },
+  availabilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  availabilityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+    gap: 4,
+  },
+  availableBadge: {
+    backgroundColor: '#ECFDF5',
+  },
+  unavailableBadge: {
+    backgroundColor: '#FEF3C7',
+  },
+  availabilityDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  availabilityText: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+  },
+  lastDonationText: {
+    fontSize: fontSize.xs,
+    color: colors.gray[400],
+    fontWeight: '600',
+  },
+  disabledRequestButton: {
+    opacity: 0.4,
+    backgroundColor: '#9CA3AF',
   },
   emptyState: {
     alignItems: 'center',

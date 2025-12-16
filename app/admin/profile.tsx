@@ -110,7 +110,7 @@ export default function AdminProfile() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F9FAFB',
   },
   header: {
     backgroundColor: '#DC2626',
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 20,
+    padding: 16,
   },
   profileCard: {
     backgroundColor: '#FFFFFF',

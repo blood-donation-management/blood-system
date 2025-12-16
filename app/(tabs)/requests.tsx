@@ -17,9 +17,12 @@ interface BloodRequest {
   status: string;
   created_at: string;
   updated_at?: string;
+  note?: string;
   // Will fetch joined data from users/donors
   admin_name?: string;
   donor_name?: string;
+  admin_email?: string;
+  donor_email?: string;
   blood_group?: string;
   phone_number?: string;
 }
@@ -31,28 +34,57 @@ export default function RequestsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
+  const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [cancelNote, setCancelNote] = useState('');
   const [selectedRequest, setSelectedRequest] = useState<BloodRequest | null>(null);
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
   const [ratingValue, setRatingValue] = useState<number>(5);
+  const [sentCount, setSentCount] = useState<number>(0);
+  const [receivedCount, setReceivedCount] = useState<number>(0);
 
   const load = async (t = type) => {
     setLoading(true);
     try {
       const data = await DonorService.getMyRequests(t);
       setItems(data);
+      
+      // Update counts for badges
+      if (t === 'sent') {
+        setSentCount(data.filter((r: BloodRequest) => r.status === 'pending').length);
+      } else {
+        setReceivedCount(data.filter((r: BloodRequest) => r.status === 'pending').length);
+      }
     } catch (e) {
       console.error('Failed to load requests', e);
     } finally {
       setLoading(false);
     }
   };
+  
+  const loadAllCounts = async () => {
+    try {
+      const sentData = await DonorService.getMyRequests('sent');
+      const receivedData = await DonorService.getMyRequests('received');
+      setSentCount(sentData.filter((r: BloodRequest) => r.status === 'pending').length);
+      setReceivedCount(receivedData.filter((r: BloodRequest) => r.status === 'pending').length);
+    } catch (e) {
+      console.error('Failed to load counts', e);
+    }
+  };
 
   useEffect(() => {
     load('sent');
+    loadAllCounts();
   }, []);
 
   useEffect(() => {
     load(type);
+    // Real-time refresh every 3 seconds
+    const interval = setInterval(() => {
+      load(type);
+      loadAllCounts();
+    }, 3000);
+    return () => clearInterval(interval);
   }, [type]);
 
   const onRefresh = async () => {
@@ -121,7 +153,15 @@ export default function RequestsScreen() {
 
       {item.message && (
         <View style={[styles.detailRow, { alignItems: 'flex-start' }]}> 
-          <Text style={[styles.detailText, { fontStyle: 'italic' }]}>Message: {item.message}</Text>
+          <MessageCircle size={14} color="#6B7280" />
+          <Text style={[styles.detailText, { fontStyle: 'italic', flex: 1 }]}>Message: {item.message}</Text>
+        </View>
+      )}
+
+      {item.note && (item.status === 'rejected' || item.status === 'cancelled' || item.status === 'declined') && (
+        <View style={styles.noteContainer}>
+          <Text style={styles.noteLabel}>{item.status === 'rejected' || item.status === 'declined' ? 'Rejection Reason' : 'Cancellation Reason'}:</Text>
+          <Text style={styles.noteText}>{item.note}</Text>
         </View>
       )}
 
@@ -148,8 +188,8 @@ export default function RequestsScreen() {
         style={styles.whatsappBtn}
         onPress={async () => {
           try {
-            const phoneNumber = type === 'sent' ? item.phoneNumber || '' : item.phoneNumber || '';
-            const partnerName = type === 'sent' ? item.donorName : item.requesterName;
+            const phoneNumber = type === 'sent' ? item.phone_number || '' : item.phone_number || '';
+            const partnerName = type === 'sent' ? item.donor_name : item.admin_name;
             await DonorService.openWhatsApp(phoneNumber, `Hi ${partnerName}, I'm reaching out regarding the blood donation request from the Blood Donation App.`);
           } catch (error) {
             Alert.alert('Error', error instanceof Error ? error.message : 'Failed to open WhatsApp');
@@ -194,20 +234,10 @@ export default function RequestsScreen() {
             <>
               <TouchableOpacity
                 style={styles.reqCancelBtn}
-                onPress={async () => {
-                  // Optimistic UI: remove the request immediately, revert on failure
-                  const original = items;
-                  setItems(prev => prev.filter(i => i.id !== item.id));
-                  try {
-                    await DonorService.cancelRequest(item.id);
-                    // Optionally refresh to get latest data
-                    // await load('sent');
-                  } catch (e: any) {
-                    console.error(e);
-                    // revert
-                    setItems(original);
-                    Alert.alert('Error', e?.message || 'Failed to cancel request');
-                  }
+                onPress={() => {
+                  setSelectedRequest(item);
+                  setCancelNote('');
+                  setCancelModalVisible(true);
                 }}
               >
                 <Text style={styles.reqCancelText}>Cancel</Text>
@@ -246,6 +276,11 @@ export default function RequestsScreen() {
         >
           <Send size={16} color={type === 'sent' ? '#FFFFFF' : '#DC2626'} />
           <Text style={[styles.switchText, type === 'sent' && styles.switchTextActive]}>Sent</Text>
+          {sentCount > 0 && (
+            <View style={styles.countBadge}>
+              <Text style={styles.countBadgeText}>{sentCount > 99 ? '99+' : sentCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.switchBtn, type === 'received' && styles.switchActive]}
@@ -253,6 +288,11 @@ export default function RequestsScreen() {
         >
           <Inbox size={16} color={type === 'received' ? '#FFFFFF' : '#DC2626'} />
           <Text style={[styles.switchText, type === 'received' && styles.switchTextActive]}>Received</Text>
+          {receivedCount > 0 && (
+            <View style={styles.countBadge}>
+              <Text style={styles.countBadgeText}>{receivedCount > 99 ? '99+' : receivedCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -314,6 +354,64 @@ export default function RequestsScreen() {
                 }}
               >
                 <Text style={styles.confirmText}>Reject</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Cancel Modal (for sent requests) */}
+      <Modal
+        transparent
+        visible={cancelModalVisible}
+        animationType="fade"
+        onRequestClose={() => setCancelModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Cancel Request</Text>
+            <Text style={styles.modalSubtitle}>
+              Add a reason why you're canceling (optional)
+            </Text>
+            <TextInput
+              placeholder="Reason (optional)"
+              placeholderTextColor="#9CA3AF"
+              style={styles.input}
+              value={cancelNote}
+              onChangeText={setCancelNote}
+              multiline
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setCancelModalVisible(false)}
+              >
+                <Text style={styles.cancelText}>Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmBtn}
+                onPress={async () => {
+                  if (!selectedRequest) return;
+                  try {
+                    // Update UI immediately
+                    setItems(prev => prev.map(i => 
+                      i.id === selectedRequest.id 
+                        ? { ...i, status: 'cancelled', note: cancelNote.trim() || undefined } 
+                        : i
+                    ));
+                    setCancelModalVisible(false);
+                    setSelectedRequest(null);
+                    
+                    await DonorService.cancelRequest(selectedRequest.id, cancelNote.trim() || undefined);
+                    Alert.alert('✓', 'Request cancelled successfully');
+                  } catch (e: any) {
+                    console.error(e);
+                    await load('sent'); // Reload on error
+                    Alert.alert('Error', e?.message || 'Failed to cancel request');
+                  }
+                }}
+              >
+                <Text style={styles.confirmText}>Cancel Request</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -490,6 +588,25 @@ const styles = StyleSheet.create({
   reqCancelText: { color: '#C2410C', fontWeight: '700' },
   completeBtn: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
   completeText: { color: '#065F46', fontWeight: '700' },
+  countBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#DC2626',
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  countBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+    paddingHorizontal: 4,
+  },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: spacing.xl },
   modalCard: { backgroundColor: colors.white, borderRadius: borderRadius.md, padding: spacing.lg, width: '100%' },
   modalTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.gray[900] },
@@ -500,4 +617,26 @@ const styles = StyleSheet.create({
   cancelText: { color: '#6B7280', fontWeight: '700' },
   confirmBtn: { backgroundColor: '#DC2626', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
   confirmText: { color: '#FFFFFF', fontWeight: '700' },
+  noteContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#FEF2F2',
+    borderLeftWidth: 3,
+    borderLeftColor: '#DC2626',
+    borderRadius: 8,
+  },
+  noteLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#DC2626',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  noteText: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+    lineHeight: 20,
+  },
 });

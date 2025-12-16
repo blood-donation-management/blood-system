@@ -15,7 +15,7 @@ import {
 import { router } from 'expo-router';
 import { ArrowLeft, User, Mail, Lock, MapPin, Phone, Droplet, Eye, EyeOff } from 'lucide-react-native';
 import { AuthService } from '@/services/AuthService';
-import { isValidEmail } from '@/utils/validation';
+import { isValidEmail, isValidBangladeshPhone } from '@/utils/validation';
 import { fontSize, spacing, colors, shadows, borderRadius, moderateScale, hp } from '@/utils/responsive';
 
 export default function Signup() {
@@ -93,6 +93,14 @@ export default function Signup() {
 
     if (formData.password.length < 6) {
       Alert.alert('Error', 'Password must be at least 6 characters long');
+      return;
+    }
+
+    if (!isValidBangladeshPhone(formData.phoneNumber)) {
+      Alert.alert(
+        'Invalid Phone Number',
+        'Please enter a valid 11-digit Bangladesh mobile number (e.g., 01712345678).\n\nValid operators: Grameenphone, Banglalink, Robi, Airtel, Teletalk'
+      );
       return;
     }
 
@@ -253,11 +261,13 @@ export default function Signup() {
               style={styles.input}
               value={formData.phoneNumber}
               onChangeText={(text) => setFormData({ ...formData, phoneNumber: text })}
-              placeholder="Enter your phone number"
+              placeholder="01712345678"
               placeholderTextColor="#9CA3AF"
               keyboardType="phone-pad"
+              maxLength={11}
             />
           </View>
+          <Text style={styles.helperText}>11-digit BD mobile number (013/014/015/016/017/018/019)</Text>
         </View>
 
         <Animated.View

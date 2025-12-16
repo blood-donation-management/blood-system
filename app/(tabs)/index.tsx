@@ -32,6 +32,7 @@ export default function Dashboard() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [profile, setProfile] = useState<DonorProfile | null>(null);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
 
   // Animation refs for all buttons
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -47,6 +48,33 @@ export default function Dashboard() {
     checkAuthStatus();
     startAnimations();
   }, []);
+
+  const fetchPendingRequestsCount = async () => {
+    try {
+      const { supabase } = await import('@/config/supabase');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { count } = await supabase
+        .from('blood_requests')
+        .select('*', { count: 'exact', head: true })
+        .eq('donor_id', user.id)
+        .eq('status', 'pending');
+
+      setPendingRequestsCount(count || 0);
+    } catch (error) {
+      console.error('Failed to fetch pending requests count:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchPendingRequestsCount();
+      // Refresh count every 30 seconds
+      const interval = setInterval(fetchPendingRequestsCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [isLoggedIn]);
 
   const startAnimations = () => {
     // Pulse animation for the icon
@@ -400,6 +428,13 @@ export default function Dashboard() {
         >
           <View style={[styles.actionIconBox, { backgroundColor: '#F59E0B' }]}>
             <Inbox size={moderateScale(22)} color={colors.white} strokeWidth={2.5} />
+            {pendingRequestsCount > 0 && (
+              <View style={styles.badgeContainer}>
+                <Text style={styles.badgeText}>
+                  {pendingRequestsCount > 99 ? '99+' : pendingRequestsCount}
+                </Text>
+              </View>
+            )}
           </View>
           <View style={styles.actionTextContainer}>
             <Text style={styles.actionTitle}>Requests</Text>
@@ -989,6 +1024,31 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 32,
+  },
+  badgeContainer: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#DC2626',
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+    textAlign: 'center',
   },
   dayCounterSection: {
     marginTop: 20,

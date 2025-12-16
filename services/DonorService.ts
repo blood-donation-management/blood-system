@@ -181,7 +181,12 @@ export class DonorService {
 
       const { data, error } = await query;
       if (error) throw new Error('Failed to search donors: ' + error.message);
-      return data || [];
+      
+      // Map database fields to camelCase for frontend
+      return (data || []).map((donor: any) => ({
+        ...donor,
+        lastDonationDate: donor.last_donation_date,
+      }));
     } catch (error: any) {
       throw new Error(error.message || 'Unable to search donors. Please try again.');
     }

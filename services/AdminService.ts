@@ -95,14 +95,32 @@ export class AdminService {
   static async getBloodRequests() {
     const { data, error } = await supabase
       .from('blood_requests')
-      .select('*')
+      .select(`
+        *,
+        donor:donors!blood_requests_donor_id_fkey(
+          name,
+          blood_group,
+          location,
+          phone_number
+        )
+      `)
       .order('created_at', { ascending: false });
 
     if (error) {
       throw new Error('Failed to fetch blood requests: ' + error.message);
     }
 
-    return data;
+    // Transform the data to include donor information at the top level
+    return (data || []).map((request: any) => ({
+      ...request,
+      donorName: request.donor?.name || 'Unknown Donor',
+      donorPhone: request.donor?.phone_number || '',
+      bloodGroup: request.donor?.blood_group || 'N/A',
+      blood_group: request.donor?.blood_group || 'N/A',
+      location: request.location || request.donor?.location || 'N/A',
+      // Keep original donor data for reference
+      donorData: request.donor
+    }));
   }
 
   // Donor management
@@ -194,6 +212,32 @@ export class AdminService {
       .eq('id', id);
 
     if (error) throw new Error('Failed to delete donor: ' + error.message);
+    return { success: true };
+  }
+
+  static async updateRequestStatus(requestId: string, status: 'pending' | 'completed' | 'rejected' | 'cancelled') {
+    // Update request status
+    const { data: request, error: updateError } = await supabase
+      .from('blood_requests')
+      .update({ status, completed_at: status === 'completed' ? new Date().toISOString() : null })
+      .eq('id', requestId)
+      .select('donor_id')
+      .single();
+
+    if (updateError) throw new Error('Failed to update request status: ' + updateError.message);
+
+    // If status is completed, update donor's last_donation_date
+    if (status === 'completed' && request?.donor_id) {
+      const { error: donorError } = await supabase
+        .from('donors')
+        .update({ last_donation_date: new Date().toISOString() })
+        .eq('id', request.donor_id);
+
+      if (donorError) {
+        console.error('Failed to update donor last donation date:', donorError);
+      }
+    }
+
     return { success: true };
   }
 }

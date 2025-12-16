@@ -30,8 +30,6 @@ export class AdminService {
   }
   static async login(username: string, password: string) {
     try {
-      console.log('[AdminService] Attempting login for username:', username);
-      
       // Direct table query (RLS must be disabled on admins table)
       const { data: admins, error } = await supabase
         .from('admins')
@@ -39,49 +37,25 @@ export class AdminService {
         .eq('username', username)
         .limit(1);
 
-      console.log('[AdminService] Query result:', { 
-        adminCount: admins?.length || 0, 
-        error: error?.message 
-      });
-
       if (error) {
-        console.error('[AdminService] Supabase error:', error);
         throw new Error('Unable to connect to the server. Please try again.');
       }
 
       if (!admins || admins.length === 0) {
-        console.error('[AdminService] No admin found with username:', username);
         throw new Error('Invalid username or password. Please check your credentials.');
       }
 
       const admin = admins[0];
-      console.log('[AdminService] Admin found, checking password...');
-      console.log('[AdminService] Stored hash:', admin.password.substring(0, 30) + '...');
-      console.log('[AdminService] Full hash length:', admin.password.length);
-      console.log('[AdminService] Password to check:', password);
       
-      // Test bcrypt is working
-      try {
-        const testHash = await bcrypt.hash('test123', 10);
-        const testCompare = await bcrypt.compare('test123', testHash);
-        console.log('[AdminService] Bcrypt test (should be true):', testCompare);
-      } catch (testErr) {
-        console.error('[AdminService] Bcrypt test failed:', testErr);
-      }
-      
-      // Compare hashed password using bcrypt
+      // Compare hashed password using bcrypt (optimized - removed test hash)
       const isPasswordValid = await bcrypt.compare(password, admin.password);
-      console.log('[AdminService] Password valid:', isPasswordValid);
       
       if (!isPasswordValid) {
-        console.error('[AdminService] Password mismatch for admin:', username);
         throw new Error('Invalid username or password. Please check your credentials.');
       }
 
-      console.log('[AdminService] Login successful for:', username);
       return { admin: { id: admin.id, username: admin.username, role: 'admin' } };
     } catch (err: any) {
-      console.error('[AdminService] Login error:', err);
       throw new Error(err.message || 'An unexpected error occurred during login.');
     }
   }
@@ -140,8 +114,6 @@ export class AdminService {
     page?: number;
     limit?: number;
   } = {}) {
-    const { data: auth } = await supabase.auth.getUser();
-    const currentUserId = auth?.user?.id;
     let query = supabase.from('donors').select('*');
 
     if (params.bloodGroup) {
@@ -154,16 +126,15 @@ export class AdminService {
       query = query.ilike('location', `%${params.location}%`);
     }
     if (params.query) {
-      query = query.or(`name.ilike.%${params.query}%,email.ilike.%${params.query}%`);
+      query = query.or(`name.ilike.%${params.query}%,email.ilike.%${params.query}%,phone_number.ilike.%${params.query}%`);
     }
 
-    if (currentUserId) {
-      query = query.neq('id', currentUserId);
-    }
+    // Order by newest first
+    query = query.order('created_at', { ascending: false });
 
     const { data, error } = await query;
     if (error) throw new Error('Failed to fetch donors: ' + error.message);
-    return data;
+    return data ?? [];
   }
 
   static async getDonor(id: string) {

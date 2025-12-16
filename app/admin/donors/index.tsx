@@ -40,7 +40,7 @@ export default function AdminDonorsList() {
   const load = async () => {
     try {
       const res = await AdminService.listDonors({ query, bloodGroup, location });
-      setItems(res.items ?? []);
+      setItems(res ?? []);
     } catch (e) {
       console.error('Failed to load donors', e);
     } finally {
@@ -138,32 +138,99 @@ export default function AdminDonorsList() {
             Joined {new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
           </Text>
         )}
-        {/* Send Request Button */}
-        <TouchableOpacity
-          style={styles.sendRequestButton}
-          onPress={async () => {
-            try {
-              const confirm = await new Promise<boolean>((resolve) => {
-                Alert.alert(
-                  'Send Blood Request',
-                  `Send request to ${item.name}?`,
-                  [
-                    { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-                    { text: 'Send', onPress: () => resolve(true) },
-                  ]
-                );
-              });
-              if (!confirm) return;
-              await AdminService.sendRequest(item.id, { location: item.location });
-              Alert.alert('Success', 'Request sent successfully');
-            } catch (e: any) {
-              Alert.alert('Error', e.message || 'Failed to send request');
-            }
-          }}
-        >
-          <Send size={14} color="#FFFFFF" />
-          <Text style={styles.sendRequestText}>Send Request</Text>
-        </TouchableOpacity>
+        {/* Admin Action Buttons */}
+        <View style={styles.adminActionsRow}>
+          {!item.verified && (
+            <TouchableOpacity
+              style={styles.verifyButton}
+              onPress={async () => {
+                try {
+                  const confirm = await new Promise<boolean>((resolve) => {
+                    Alert.alert(
+                      'Verify Donor',
+                      `Verify ${item.name} as a legitimate donor?`,
+                      [
+                        { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                        { text: 'Verify', onPress: () => resolve(true) },
+                      ]
+                    );
+                  });
+                  if (!confirm) return;
+                  await AdminService.verifyDonor(item.id, true, 'Verified by admin');
+                  Alert.alert('Success', 'Donor verified successfully');
+                  load();
+                } catch (e: any) {
+                  Alert.alert('Error', e.message || 'Failed to verify donor');
+                }
+              }}
+            >
+              <CheckCircle2 size={14} color="#FFFFFF" />
+              <Text style={styles.verifyButtonText}>Verify</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={item.status === 'suspended' ? styles.activateButton : styles.suspendButton}
+            onPress={async () => {
+              try {
+                const newStatus = item.status === 'suspended' ? 'active' : 'suspended';
+                const action = newStatus === 'suspended' ? 'Suspend' : 'Activate';
+                const confirm = await new Promise<boolean>((resolve) => {
+                  Alert.alert(
+                    `${action} Donor`,
+                    `${action} ${item.name}?`,
+                    [
+                      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                      { text: action, onPress: () => resolve(true) },
+                    ]
+                  );
+                });
+                if (!confirm) return;
+                await AdminService.updateDonorStatus(item.id, newStatus, `${action}d by admin`);
+                Alert.alert('Success', `Donor ${action.toLowerCase()}d successfully`);
+                load();
+              } catch (e: any) {
+                Alert.alert('Error', e.message || 'Failed to update donor status');
+              }
+            }}
+          >
+            {item.status === 'suspended' ? (
+              <>
+                <CheckCircle2 size={14} color="#FFFFFF" />
+                <Text style={styles.activateButtonText}>Activate</Text>
+              </>
+            ) : (
+              <>
+                <ShieldX size={14} color="#FFFFFF" />
+                <Text style={styles.suspendButtonText}>Suspend</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={async () => {
+              try {
+                const confirm = await new Promise<boolean>((resolve) => {
+                  Alert.alert(
+                    'Delete Donor',
+                    `Permanently delete ${item.name}? This action cannot be undone.`,
+                    [
+                      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                      { text: 'Delete', style: 'destructive', onPress: () => resolve(true) },
+                    ]
+                  );
+                });
+                if (!confirm) return;
+                await AdminService.deleteDonor(item.id);
+                Alert.alert('Success', 'Donor deleted successfully');
+                load();
+              } catch (e: any) {
+                Alert.alert('Error', e.message || 'Failed to delete donor');
+              }
+            }}
+          >
+            <Text style={styles.deleteButtonText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -305,7 +372,7 @@ export default function AdminDonorsList() {
 
       <FlatList
         data={items}
-        keyExtractor={(i) => i._id}
+        keyExtractor={(i) => i.id}
         renderItem={renderItem}
         contentContainerStyle={{ padding: 16 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -496,20 +563,72 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB' },
   loadingText: { marginTop: 12, color: '#6B7280', fontSize: 16, fontWeight: '600' },
   empty: { textAlign: 'center', color: '#6B7280', padding: 40, fontSize: 16, fontWeight: '500' },
-  sendRequestButton: {
+  adminActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#DC2626',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 10,
+    gap: 8,
+    marginTop: spacing.xs,
+    flexWrap: 'wrap',
+  },
+  verifyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#059669',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
     ...shadows.sm,
   },
-  sendRequestText: {
+  verifyButtonText: {
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  suspendButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F59E0B',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    ...shadows.sm,
+  },
+  suspendButtonText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  activateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#10B981',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    ...shadows.sm,
+  },
+  activateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#DC2626',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    ...shadows.sm,
+  },
+  deleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
   },
 
 });

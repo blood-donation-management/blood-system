@@ -83,6 +83,18 @@ export default function AdminDonorsList() {
     load();
   };
 
+  const updateItemInState = (id: string, updates: Partial<DonorItem>) => {
+    setItems(prevItems => 
+      prevItems.map(item => 
+        item.id === id ? { ...item, ...updates } : item
+      )
+    );
+  };
+
+  const removeItemFromState = (id: string) => {
+    setItems(prevItems => prevItems.filter(item => item.id !== id));
+  };
+
   const renderItem = ({ item }: { item: DonorItem }) => (
     <TouchableOpacity style={styles.donorCard} onPress={() => router.push(`/admin/donors/${item.id}`)}>
       <View style={styles.cardHeader}>
@@ -122,10 +134,12 @@ export default function AdminDonorsList() {
         </View>
       </View>
 
-      <View style={styles.cardFooter}>
+      <View style={styles.statusRow}>
         <View style={[styles.statusBadge, item.status === 'active' ? styles.statusActive : styles.statusSuspended]}>
-          <View style={styles.statusDot} />
-          <Text style={styles.statusText}>{item.status === 'suspended' ? 'Suspended' : 'Active'}</Text>
+          <View style={[styles.statusDot, item.status === 'active' ? { backgroundColor: '#059669' } : { backgroundColor: '#DC2626' }]} />
+          <Text style={[styles.statusText, item.status === 'active' ? { color: '#059669' } : { color: '#DC2626' }]}>
+            {item.status === 'suspended' ? 'Suspended' : 'Active'}
+          </Text>
         </View>
         <View style={[styles.verifiedBadge, item.verified ? styles.verifiedTrue : styles.verifiedFalse]}>
           <CheckCircle2 size={moderateScale(12)} color={item.verified ? '#059669' : colors.gray[400]} />
@@ -138,99 +152,107 @@ export default function AdminDonorsList() {
             Joined {new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
           </Text>
         )}
-        {/* Admin Action Buttons */}
-        <View style={styles.adminActionsRow}>
-          {!item.verified && (
-            <TouchableOpacity
-              style={styles.verifyButton}
-              onPress={async () => {
-                try {
-                  const confirm = await new Promise<boolean>((resolve) => {
-                    Alert.alert(
-                      'Verify Donor',
-                      `Verify ${item.name} as a legitimate donor?`,
-                      [
-                        { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-                        { text: 'Verify', onPress: () => resolve(true) },
-                      ]
-                    );
-                  });
-                  if (!confirm) return;
-                  await AdminService.verifyDonor(item.id, true, 'Verified by admin');
-                  Alert.alert('Success', 'Donor verified successfully');
-                  load();
-                } catch (e: any) {
-                  Alert.alert('Error', e.message || 'Failed to verify donor');
-                }
-              }}
-            >
+      </View>
+
+      {/* Admin Action Buttons */}
+      <View style={styles.adminActionsRow}>
+        {!item.verified && (
+          <TouchableOpacity
+            style={styles.verifyButton}
+            onPress={async (e) => {
+              e.stopPropagation();
+              try {
+                const confirm = await new Promise<boolean>((resolve) => {
+                  Alert.alert(
+                    'Verify Donor',
+                    `Verify ${item.name} as a legitimate donor?`,
+                    [
+                      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                      { text: 'Verify', onPress: () => resolve(true) },
+                    ]
+                  );
+                });
+                if (!confirm) return;
+                updateItemInState(item.id, { verified: true });
+                await AdminService.verifyDonor(item.id, true, 'Verified by admin');
+                Alert.alert('✓', 'Donor verified', [{ text: 'OK' }], { cancelable: true });
+              } catch (e: any) {
+                updateItemInState(item.id, { verified: false });
+                Alert.alert('Error', e.message || 'Failed to verify donor');
+              }
+            }}
+          >
+            <CheckCircle2 size={14} color="#FFFFFF" />
+            <Text style={styles.verifyButtonText}>Verify</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={item.status === 'suspended' ? styles.activateButton : styles.suspendButton}
+          onPress={async (e) => {
+            e.stopPropagation();
+            try {
+              const newStatus = item.status === 'suspended' ? 'active' : 'suspended';
+              const action = newStatus === 'suspended' ? 'Suspend' : 'Activate';
+              const confirm = await new Promise<boolean>((resolve) => {
+                Alert.alert(
+                  `${action} Donor`,
+                  `${action} ${item.name}?`,
+                  [
+                    { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                    { text: action, onPress: () => resolve(true) },
+                  ]
+                );
+              });
+              if (!confirm) return;
+              updateItemInState(item.id, { status: newStatus });
+              await AdminService.updateDonorStatus(item.id, newStatus, `${action}d by admin`);
+              Alert.alert('✓', `Donor ${action.toLowerCase()}d`, [{ text: 'OK' }], { cancelable: true });
+            } catch (e: any) {
+              const revertStatus = item.status === 'suspended' ? 'active' : 'suspended';
+              updateItemInState(item.id, { status: revertStatus });
+              Alert.alert('Error', e.message || 'Failed to update donor status');
+            }
+          }}
+        >
+          {item.status === 'suspended' ? (
+            <>
               <CheckCircle2 size={14} color="#FFFFFF" />
-              <Text style={styles.verifyButtonText}>Verify</Text>
-            </TouchableOpacity>
+              <Text style={styles.activateButtonText}>Activate</Text>
+            </>
+          ) : (
+            <>
+              <ShieldX size={14} color="#FFFFFF" />
+              <Text style={styles.suspendButtonText}>Suspend</Text>
+            </>
           )}
-          <TouchableOpacity
-            style={item.status === 'suspended' ? styles.activateButton : styles.suspendButton}
-            onPress={async () => {
-              try {
-                const newStatus = item.status === 'suspended' ? 'active' : 'suspended';
-                const action = newStatus === 'suspended' ? 'Suspend' : 'Activate';
-                const confirm = await new Promise<boolean>((resolve) => {
-                  Alert.alert(
-                    `${action} Donor`,
-                    `${action} ${item.name}?`,
-                    [
-                      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-                      { text: action, onPress: () => resolve(true) },
-                    ]
-                  );
-                });
-                if (!confirm) return;
-                await AdminService.updateDonorStatus(item.id, newStatus, `${action}d by admin`);
-                Alert.alert('Success', `Donor ${action.toLowerCase()}d successfully`);
-                load();
-              } catch (e: any) {
-                Alert.alert('Error', e.message || 'Failed to update donor status');
-              }
-            }}
-          >
-            {item.status === 'suspended' ? (
-              <>
-                <CheckCircle2 size={14} color="#FFFFFF" />
-                <Text style={styles.activateButtonText}>Activate</Text>
-              </>
-            ) : (
-              <>
-                <ShieldX size={14} color="#FFFFFF" />
-                <Text style={styles.suspendButtonText}>Suspend</Text>
-              </>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={async () => {
-              try {
-                const confirm = await new Promise<boolean>((resolve) => {
-                  Alert.alert(
-                    'Delete Donor',
-                    `Permanently delete ${item.name}? This action cannot be undone.`,
-                    [
-                      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-                      { text: 'Delete', style: 'destructive', onPress: () => resolve(true) },
-                    ]
-                  );
-                });
-                if (!confirm) return;
-                await AdminService.deleteDonor(item.id);
-                Alert.alert('Success', 'Donor deleted successfully');
-                load();
-              } catch (e: any) {
-                Alert.alert('Error', e.message || 'Failed to delete donor');
-              }
-            }}
-          >
-            <Text style={styles.deleteButtonText}>Delete</Text>
-          </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={async (e) => {
+            e.stopPropagation();
+            try {
+              const confirm = await new Promise<boolean>((resolve) => {
+                Alert.alert(
+                  'Delete Donor',
+                  `Permanently delete ${item.name}? This action cannot be undone.`,
+                  [
+                    { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                    { text: 'Delete', style: 'destructive', onPress: () => resolve(true) },
+                  ]
+                );
+              });
+              if (!confirm) return;
+              removeItemFromState(item.id);
+              await AdminService.deleteDonor(item.id);
+              Alert.alert('✓', 'Donor deleted', [{ text: 'OK' }], { cancelable: true });
+            } catch (e: any) {
+              load();
+              Alert.alert('Error', e.message || 'Failed to delete donor');
+            }
+          }}
+        >
+          <Text style={styles.deleteButtonText}>Delete</Text>
+        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -501,11 +523,12 @@ const styles = StyleSheet.create({
     color: colors.gray[900],
     fontWeight: '700',
   },
-  cardFooter: {
+  statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
     borderTopWidth: 1,
     borderTopColor: colors.gray[100],
   },
@@ -567,7 +590,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: spacing.xs,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[50],
     flexWrap: 'wrap',
   },
   verifyButton: {

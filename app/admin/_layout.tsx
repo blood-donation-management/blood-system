@@ -4,40 +4,67 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { View, Text, StyleSheet } from 'react-native';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/config/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const SEEN_NOTIFICATIONS_KEY = 'admin_seen_notifications';
 
 export default function AdminTabsLayout() {
-  const [pendingCount, setPendingCount] = useState(0);
+  const [unseenCount, setUnseenCount] = useState(0);
   const [reportsCount, setReportsCount] = useState(0);
 
   useEffect(() => {
-    fetchPendingCount();
+    fetchUnseenCount();
     fetchReportsCount();
     const interval = setInterval(() => {
-      fetchPendingCount();
+      fetchUnseenCount();
       fetchReportsCount();
     }, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  const fetchPendingCount = async () => {
+  const fetchUnseenCount = async () => {
     try {
-      const { count } = await supabase
+      // Get all notifications
+      const { data: notifications } = await supabase
         .from('blood_requests')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-      setPendingCount(count || 0);
+        .select('id');
+
+      if (!notifications) {
+        setUnseenCount(0);
+        return;
+      }
+
+      // Get seen notification IDs from AsyncStorage
+      const stored = await AsyncStorage.getItem(SEEN_NOTIFICATIONS_KEY);
+      const seenIds = stored ? new Set(JSON.parse(stored)) : new Set();
+
+      // Count unseen notifications
+      const unseen = notifications.filter(n => !seenIds.has(n.id));
+      setUnseenCount(unseen.length);
     } catch (error) {
-      console.error('Failed to fetch pending count:', error);
+      console.error('Failed to fetch unseen count:', error);
     }
   };
 
   const fetchReportsCount = async () => {
     try {
-      const { count } = await supabase
+      // Get all reports
+      const { data: reports } = await supabase
         .from('user_reports')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-      setReportsCount(count || 0);
+        .select('id');
+
+      if (!reports) {
+        setReportsCount(0);
+        return;
+      }
+
+      // Get seen report IDs from AsyncStorage
+      const stored = await AsyncStorage.getItem('admin_seen_reports');
+      const seenIds = stored ? new Set(JSON.parse(stored)) : new Set();
+
+      // Count unseen reports
+      const unseen = reports.filter(r => !seenIds.has(r.id));
+      setReportsCount(unseen.length);
     } catch (error) {
       console.error('Failed to fetch reports count:', error);
     }
@@ -104,10 +131,10 @@ export default function AdminTabsLayout() {
           tabBarIcon: ({ size, color }: { size: number; color: string }) => (
             <View>
               <Bell size={size + 2} color={color} strokeWidth={2.5} />
-              {pendingCount > 0 && (
+              {unseenCount > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>
-                    {pendingCount > 99 ? '99+' : pendingCount}
+                    {unseenCount > 99 ? '99+' : unseenCount}
                   </Text>
                 </View>
               )}

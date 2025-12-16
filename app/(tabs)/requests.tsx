@@ -149,7 +149,7 @@ export default function RequestsScreen() {
       )}
       <View style={styles.detailRow}>
         <Clock size={14} color="#6B7280" />
-        <Text style={styles.detailText}>{new Date(item.created_at).toLocaleString()}</Text>
+        <Text style={styles.detailText}>{new Date(item.created_at).toLocaleString('en-BD', { timeZone: 'Asia/Dhaka' })}</Text>
       </View>
 
       {item.message && (
@@ -244,19 +244,31 @@ export default function RequestsScreen() {
               >
                 <Text style={styles.reqCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.completeBtn}
-                onPress={() => {
-                  setSelectedRequest(item);
-                  setRatingValue(5);
-                  setRatingModalVisible(true);
-                }}
-              >
-                <Text style={styles.completeText}>Complete</Text>
-              </TouchableOpacity>
             </>
           )}
-          {/* No complete action for received; recipients can only reject */}
+        </View>
+      ) : item.status === 'accepted' && type === 'sent' ? (
+        <View style={[styles.actionsRow, { gap: 10 }]}>
+          <TouchableOpacity
+            style={styles.completeBtn}
+            onPress={() => {
+              setSelectedRequest(item);
+              setRatingValue(5);
+              setRatingModalVisible(true);
+            }}
+          >
+            <Text style={styles.completeText}>Mark Complete - Rate Donor</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.reqCancelBtn}
+            onPress={() => {
+              setSelectedRequest(item);
+              setCancelNote('');
+              setCancelModalVisible(true);
+            }}
+          >
+            <Text style={styles.reqCancelText}>Cancel</Text>
+          </TouchableOpacity>
         </View>
       ) : null}
     </View>

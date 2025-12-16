@@ -243,6 +243,13 @@ export default function Dashboard() {
   const loadProfile = async () => {
     try {
       const donorProfile = await DonorService.getProfile();
+      
+      // Check if user is banned
+      if (donorProfile.status === 'suspended') {
+        router.replace('/banned');
+        return;
+      }
+      
       setProfile(donorProfile);
     } catch (error: any) {
       console.error('Failed to load profile:', error);
@@ -382,7 +389,7 @@ export default function Dashboard() {
               )}
               {profile.last_donation_date && (
                 <Text style={styles.lastDonationText}>
-                  Last: {new Date(profile.last_donation_date).toLocaleDateString()}
+                  Last: {new Date(profile.last_donation_date).toLocaleDateString('en-BD', { timeZone: 'Asia/Dhaka' })}
                 </Text>
               )}
             </View>

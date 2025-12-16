@@ -17,6 +17,9 @@ import { AdminService } from '@/services/AdminService';
 import { AdminSetup } from '@/services/AdminSetup';
 import { fontSize, spacing, colors, shadows, borderRadius, moderateScale, hp } from '@/utils/responsive';
 
+// Set to false in production to hide the setup button
+const ENABLE_SETUP_BUTTON = __DEV__;
+
 export default function AdminLogin() {
   const [credentials, setCredentials] = useState({
     username: '',
@@ -80,17 +83,18 @@ export default function AdminLogin() {
 
   const handleSetupAdmin = async () => {
     Alert.alert(
-      'Setup Admin Account',
-      'This will create/reset the admin account with:\nUsername: admin\nPassword: admin123',
+      '⚠️ Security Warning',
+      'This will create/reset admin account with DEFAULT credentials.\n\nUsername: admin\nPassword: admin123\n\n⚠️ IMPORTANT: Change these credentials immediately after first login!\n\nThis feature should be disabled in production.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Setup',
+          text: 'I Understand, Proceed',
+          style: 'destructive',
           onPress: async () => {
             try {
               setIsLoading(true);
               const result = await AdminSetup.setupDefaultAdmin();
-              Alert.alert('Success!', result.message);
+              Alert.alert('Success!', result.message + '\n\n⚠️ Remember to change the default password immediately!');
               setCredentials({ username: 'admin', password: 'admin123' });
             } catch (error: any) {
               Alert.alert('Setup Failed', error.message || 'Could not setup admin account');
@@ -164,14 +168,16 @@ export default function AdminLogin() {
               </View>
             )}
             
-            <TouchableOpacity 
-              style={styles.setupButton}
-              onPress={handleSetupAdmin}
-              disabled={isLoading}
-            >
-              <Settings size={moderateScale(18)} color="#2563EB" />
-              <Text style={styles.setupButtonText}>Setup Admin Account</Text>
-            </TouchableOpacity>
+            {ENABLE_SETUP_BUTTON && (
+              <TouchableOpacity 
+                style={styles.setupButton}
+                onPress={handleSetupAdmin}
+                disabled={isLoading}
+              >
+                <Settings size={moderateScale(18)} color="#2563EB" />
+                <Text style={styles.setupButtonText}>Setup Admin Account (Dev Only)</Text>
+              </TouchableOpacity>
+            )}
             
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Username</Text>
@@ -184,6 +190,9 @@ export default function AdminLogin() {
                   placeholder="Enter your username"
                   placeholderTextColor={colors.gray[400]}
                   autoCapitalize="none"
+                  autoComplete="off"
+                  autoCorrect={false}
+                  textContentType="none"
                 />
               </View>
             </View>
@@ -199,6 +208,9 @@ export default function AdminLogin() {
                   placeholder="Enter your password"
                   placeholderTextColor="#D1D5DB"
                   secureTextEntry
+                  autoComplete="off"
+                  autoCorrect={false}
+                  textContentType="none"
                 />
               </View>
             </View>

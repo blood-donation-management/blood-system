@@ -29,6 +29,7 @@ interface Donor {
   eligible?: boolean;
   days_until_eligible?: number;
   lastDonationDate?: string;
+  hasAcceptedRequest?: boolean;
 }
 
 export default function SearchDonors() {
@@ -54,10 +55,10 @@ export default function SearchDonors() {
     startAnimations();
   }, []);
 
-  // Load all donors initially without filters and check if admin
+  // Check admin status and load all donors on mount
   useEffect(() => {
     checkAdminStatus();
-    searchDonors();
+    searchDonors(); // Load all donors initially
   }, []);
 
   const calculateAvailability = (lastDonationDate: string | undefined) => {
@@ -375,9 +376,15 @@ export default function SearchDonors() {
                   {availability.message}
                 </Text>
               </View>
+              {item.hasAcceptedRequest && (
+                <View style={[styles.availabilityBadge, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}>
+                  <View style={[styles.availabilityDot, { backgroundColor: '#F59E0B' }]} />
+                  <Text style={[styles.availabilityText, { color: '#D97706' }]}>Busy</Text>
+                </View>
+              )}
               {item.lastDonationDate && (
                 <Text style={styles.lastDonationText}>
-                  Last: {new Date(item.lastDonationDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  Last: {new Date(item.lastDonationDate).toLocaleDateString('en-BD', { month: 'short', day: 'numeric', timeZone: 'Asia/Dhaka' })}
                 </Text>
               )}
             </View>

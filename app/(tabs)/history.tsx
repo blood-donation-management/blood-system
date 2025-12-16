@@ -32,10 +32,11 @@ export default function DonationHistory() {
 
   const renderItem = ({ item }: { item: BloodDonation }) => {
     const donationDate = new Date(item.donation_date);
-    const dateStr = donationDate.toLocaleDateString('en-US', {
+    const dateStr = donationDate.toLocaleDateString('en-BD', {
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
+      timeZone: 'Asia/Dhaka'
     });
 
     return (

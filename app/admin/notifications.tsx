@@ -4,6 +4,7 @@ import { Bell, Users, Droplet, MapPin, Calendar, CheckCircle, Clock } from 'luci
 import { AdminService } from '@/services/AdminService';
 import { captureRef } from 'react-native-view-shot';
 import { LongPressGestureHandler, State } from 'react-native-gesture-handler';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fontSize, spacing, colors, shadows, borderRadius, moderateScale, hp, wp } from '@/utils/responsive';
 
 interface BloodRequest {
@@ -31,12 +32,44 @@ interface BloodRequest {
   };
 }
 
+const SEEN_NOTIFICATIONS_KEY = 'admin_seen_notifications';
+
 export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<BloodRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [pendingCount, setPendingCount] = useState(0);
+  const [unseenCount, setUnseenCount] = useState(0);
+  const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
   const viewRef = useRef<View>(null);
+
+  // Load seen notification IDs from storage
+  const loadSeenIds = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(SEEN_NOTIFICATIONS_KEY);
+      if (stored) {
+        setSeenIds(new Set(JSON.parse(stored)));
+      }
+    } catch (error) {
+      console.error('Failed to load seen IDs:', error);
+    }
+  };
+
+  // Save seen notification IDs to storage
+  const saveSeenIds = async (ids: Set<string>) => {
+    try {
+      await AsyncStorage.setItem(SEEN_NOTIFICATIONS_KEY, JSON.stringify(Array.from(ids)));
+    } catch (error) {
+      console.error('Failed to save seen IDs:', error);
+    }
+  };
+
+  // Mark notifications as seen
+  const markNotificationsAsSeen = useCallback(async (notificationIds: string[]) => {
+    const newSeenIds = new Set(seenIds);
+    notificationIds.forEach(id => newSeenIds.add(id));
+    setSeenIds(newSeenIds);
+    await saveSeenIds(newSeenIds);
+  }, [seenIds]);
 
   const loadNotifications = async () => {
     try {
@@ -49,9 +82,12 @@ export default function NotificationsScreen() {
       });
       setNotifications(sortedRequests);
       
-      // Count pending requests
-      const pending = sortedRequests.filter((r: any) => r.status === 'pending').length;
-      setPendingCount(pending);
+      // Count unseen notifications (not in seenIds)
+      const unseen = sortedRequests.filter((r: any) => {
+        const id = r.id || r._id;
+        return !seenIds.has(id);
+      }).length;
+      setUnseenCount(unseen);
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
       Alert.alert('Error', 'Failed to load notifications');
@@ -61,6 +97,12 @@ export default function NotificationsScreen() {
     }
   };
 
+  // Load seen IDs on mount
+  useEffect(() => {
+    loadSeenIds();
+  }, []);
+
+  // Load notifications when seenIds are ready
   useEffect(() => {
     loadNotifications();
     // Real-time auto-refresh every 3 seconds
@@ -68,7 +110,7 @@ export default function NotificationsScreen() {
       loadNotifications();
     }, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [seenIds]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -143,22 +185,59 @@ export default function NotificationsScreen() {
       if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
       if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
       
-      // Show full date for older items - using local time
+      // Show full date for older items - using Bangladesh time
       return date.toLocaleString('en-BD', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
-        hour12: true
+        hour12: true,
+        timeZone: 'Asia/Dhaka'
       });
     } catch (e) {
       return 'Invalid date';
     }
   };
 
-  const renderNotification = ({ item }: { item: BloodRequest }) => (
-    <View style={styles.notificationCard}>
+  // Detailed date display for Bangladesh timezone
+  const formatDateDetailed = (dateStr: string | undefined) => {
+    if (!dateStr) return 'Unknown date';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return 'Invalid date';
+      return date.toLocaleString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Dhaka'
+      });
+    } catch (e) {
+      return 'Invalid date';
+    }
+  };
+
+  const renderNotification = ({ item }: { item: BloodRequest }) => {
+    const itemId = (item as any).id || (item as any)._id;
+    const isUnseen = itemId && !seenIds.has(itemId);
+    
+    return (
+    <TouchableOpacity 
+      style={[styles.notificationCard, isUnseen && styles.unseenCard]}
+      activeOpacity={0.7}
+      onPress={() => {
+        const id = (item as any).id || (item as any)._id;
+        if (id && !seenIds.has(id)) {
+          markNotificationsAsSeen([id]);
+        }
+      }}
+    >
+            {isUnseen && (
+              <View style={styles.unseenIndicator} />
+            )}
       <View style={styles.notificationGradient} />
       
       <View style={styles.statusBadge}>
@@ -182,21 +261,7 @@ export default function NotificationsScreen() {
               {formatDateTime(item.created_at || item.createdAt)}
             </Text>
             <Text style={[styles.notificationTime, { fontSize: 10, color: '#9CA3AF', marginTop: 2 }]}>
-              {(() => {
-                try {
-                  const date = new Date(item.created_at || item.createdAt || '');
-                  return date.toLocaleString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: true
-                  });
-                } catch (e) {
-                  return 'Invalid date';
-                }
-              })()}
+              {formatDateDetailed(item.created_at || item.createdAt)}
             </Text>
           </View>
         </View>
@@ -259,132 +324,10 @@ export default function NotificationsScreen() {
             <Text style={[styles.messageText, { color: '#991B1B' }]}>{(item as any).rejection_reason}</Text>
           </View>
         )}
-
-        {/* Admin Action Buttons */}
-        <View style={styles.actionButtons}>
-          {item.status !== 'completed' && (
-            <TouchableOpacity
-              style={styles.completeButton}
-              onPress={async () => {
-                try {
-                  const confirm = await new Promise<boolean>((resolve) => {
-                    Alert.alert(
-                      'Complete Donation',
-                      `Mark this donation as completed? This will update ${item.donorName}'s last donation date.`,
-                      [
-                        { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-                        { text: 'Complete', onPress: () => resolve(true) },
-                      ]
-                    );
-                  });
-                  if (!confirm) return;
-                  
-                  // Update in state immediately
-                  const itemId = (item as any).id || (item as any)._id;
-                  setNotifications(prev => {
-                    const updated = prev.map(n => ((n as any).id || (n as any)._id) === itemId ? { ...n, status: 'completed' } : n);
-                    // Update pending count
-                    const newPendingCount = updated.filter((r: any) => r.status === 'pending').length;
-                    setPendingCount(newPendingCount);
-                    return updated;
-                  });
-                  
-                  await AdminService.updateRequestStatus(itemId, 'completed');
-                  Alert.alert('✓', 'Donation marked as completed');
-                } catch (e: any) {
-                  // Revert on error
-                  setNotifications(prev => 
-                    prev.map(n => n._id === item._id ? { ...n, status: item.status } : n)
-                  );
-                  Alert.alert('Error', e.message || 'Failed to update status');
-                }
-              }}
-            >
-              <CheckCircle size={16} color="#FFFFFF" />
-              <Text style={styles.buttonText}>Mark Complete</Text>
-            </TouchableOpacity>
-          )}
-          {item.status === 'completed' && (
-            <TouchableOpacity
-              style={styles.revertButton}
-              onPress={async () => {
-                try {
-                  const confirm = await new Promise<boolean>((resolve) => {
-                    Alert.alert(
-                      'Revert Status',
-                      'Change status back to pending?',
-                      [
-                        { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-                        { text: 'Revert', onPress: () => resolve(true) },
-                      ]
-                    );
-                  });
-                  if (!confirm) return;
-                  
-                  const itemId = (item as any).id || (item as any)._id;
-                  setNotifications(prev => {
-                    const updated = prev.map(n => ((n as any).id || (n as any)._id) === itemId ? { ...n, status: 'pending' } : n);
-                    // Update pending count
-                    const newPendingCount = updated.filter((r: any) => r.status === 'pending').length;
-                    setPendingCount(newPendingCount);
-                    return updated;
-                  });
-                  
-                  await AdminService.updateRequestStatus(itemId, 'pending');
-                  Alert.alert('✓', 'Status reverted to pending');
-                } catch (e: any) {
-                  setNotifications(prev => 
-                    prev.map(n => n._id === item._id ? { ...n, status: item.status } : n)
-                  );
-                  Alert.alert('Error', e.message || 'Failed to update status');
-                }
-              }}
-            >
-              <Clock size={16} color="#FFFFFF" />
-              <Text style={styles.buttonText}>Revert to Pending</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            style={styles.rejectButton}
-            onPress={async () => {
-              try {
-                const confirm = await new Promise<boolean>((resolve) => {
-                  Alert.alert(
-                    'Reject Request',
-                    'Mark this request as rejected?',
-                    [
-                      { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-                      { text: 'Reject', style: 'destructive', onPress: () => resolve(true) },
-                    ]
-                  );
-                });
-                if (!confirm) return;
-                
-                const itemId = (item as any).id || (item as any)._id;
-                setNotifications(prev => {
-                  const updated = prev.map(n => ((n as any).id || (n as any)._id) === itemId ? { ...n, status: 'rejected' } : n);
-                  // Update pending count
-                  const newPendingCount = updated.filter((r: any) => r.status === 'pending').length;
-                  setPendingCount(newPendingCount);
-                  return updated;
-                });
-                
-                await AdminService.updateRequestStatus(itemId, 'rejected');
-                Alert.alert('✓', 'Request rejected');
-              } catch (e: any) {
-                setNotifications(prev => 
-                  prev.map(n => n._id === item._id ? { ...n, status: item.status } : n)
-                );
-                Alert.alert('Error', e.message || 'Failed to update status');
-              }
-            }}
-          >
-            <Text style={styles.buttonText}>Reject</Text>
-          </TouchableOpacity>
-        </View>
       </View>
-    </View>
-  );
+    </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
@@ -406,14 +349,14 @@ export default function NotificationsScreen() {
           <View style={styles.header}>
             <View style={styles.headerTitleRow}>
               <Text style={styles.headerTitle}>Notifications</Text>
-              {pendingCount > 0 && (
+              {unseenCount > 0 && (
                 <View style={styles.headerBadge}>
-                  <Text style={styles.headerBadgeText}>{pendingCount > 99 ? '99+' : pendingCount}</Text>
+                  <Text style={styles.headerBadgeText}>{unseenCount > 99 ? '99+' : unseenCount}</Text>
                 </View>
               )}
             </View>
             <Text style={styles.headerSubtitle}>
-              {pendingCount > 0 ? `${pendingCount} pending request${pendingCount > 1 ? 's' : ''}` : 'Real-time blood request updates'}
+              {unseenCount > 0 ? `${unseenCount} new notification${unseenCount > 1 ? 's' : ''}` : 'Real-time blood request updates'}
             </Text>
           </View>
         </LongPressGestureHandler>
@@ -503,11 +446,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     marginBottom: 12,
-    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
+    elevation: 3,
+  },
+  unseenCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#2563EB',
+  },
+  unseenIndicator: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#2563EB',
+    zIndex: 10,
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
     elevation: 3,
   },
   notificationGradient: {
@@ -515,7 +476,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: '35%',
+    height: 60,
     backgroundColor: '#FEF2F2',
   },
   statusBadge: {

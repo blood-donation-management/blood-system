@@ -17,6 +17,7 @@ interface DonorItem {
   status?: 'active' | 'suspended';
   verified?: boolean;
   created_at?: string;
+  hasAcceptedRequest?: boolean;
 }
 
 const BLOOD_GROUPS = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
@@ -56,7 +57,7 @@ export default function AdminDonorsList() {
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     load();
-  }, [query, bloodGroup, location]);
+  }, []);
 
   const handleScreenshot = async () => {
     if (!viewRef.current) return;
@@ -141,6 +142,12 @@ export default function AdminDonorsList() {
             {item.status === 'suspended' ? 'Suspended' : 'Active'}
           </Text>
         </View>
+        {item.hasAcceptedRequest && (
+          <View style={[styles.statusBadge, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}>
+            <View style={[styles.statusDot, { backgroundColor: '#F59E0B' }]} />
+            <Text style={[styles.statusText, { color: '#D97706' }]}>Busy</Text>
+          </View>
+        )}
         <View style={[styles.verifiedBadge, item.verified ? styles.verifiedTrue : styles.verifiedFalse]}>
           <CheckCircle2 size={moderateScale(12)} color={item.verified ? '#059669' : colors.gray[400]} />
           <Text style={[styles.verifiedText, item.verified && styles.verifiedTextTrue]}>

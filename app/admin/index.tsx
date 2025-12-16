@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
-import { Shield, Users, Calendar, MapPin, Droplet, Mail, Phone, User } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Alert, TouchableOpacity, Modal, TextInput } from 'react-native';
+import { Shield, Users, Calendar, MapPin, Droplet, Mail, Phone, User, X } from 'lucide-react-native';
 import { AdminService } from '@/services/AdminService';
 import { captureRef } from 'react-native-view-shot';
 import { GestureHandlerRootView, LongPressGestureHandler, State } from 'react-native-gesture-handler';
@@ -15,6 +15,8 @@ interface BloodRequest {
   blood_group: string;
   location: string;
   created_at: string;
+  status?: 'pending' | 'accepted' | 'rejected' | 'completed';
+  rejection_reason?: string;
 }
 
 export default function AdminDashboard() {
@@ -75,17 +77,76 @@ export default function AdminDashboard() {
     }
   };
 
+  const [rejectModalVisible, setRejectModalVisible] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
+
+  const handleRejectRequest = (requestId: string) => {
+    setSelectedRequestId(requestId);
+    setRejectModalVisible(true);
+  };
+
+  const submitRejection = async () => {
+    if (!selectedRequestId) return;
+    
+    if (!rejectionReason.trim()) {
+      Alert.alert('Error', 'Please provide a rejection reason');
+      return;
+    }
+
+    try {
+      await AdminService.rejectRequest(selectedRequestId, rejectionReason);
+      Alert.alert('Success', 'Request rejected successfully');
+      setRejectModalVisible(false);
+      setRejectionReason('');
+      setSelectedRequestId(null);
+      load(); // Refresh the list
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to reject request');
+    }
+  };
+
+  const getStatusColor = (status?: string) => {
+    switch (status) {
+      case 'pending':
+        return '#F59E0B';
+      case 'accepted':
+        return '#3B82F6';
+      case 'completed':
+        return '#10B981';
+      case 'rejected':
+        return '#DC2626';
+      default:
+        return '#6B7280';
+    }
+  };
+
+  const getStatusLabel = (status?: string) => {
+    switch (status) {
+      case 'pending':
+        return 'Pending';
+      case 'accepted':
+        return 'Accepted';
+      case 'completed':
+        return 'Completed';
+      case 'rejected':
+        return 'Rejected';
+      default:
+        return 'Unknown';
+    }
+  };
+
   const renderItem = ({ item }: { item: BloodRequest }) => (
     <View style={styles.card}>
       <View style={styles.cardGradient} />
       <View style={styles.cardHeader}>
         <View style={styles.titleRow}>
           <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>{item.requesterName.charAt(0).toUpperCase()}</Text>
+            <Text style={styles.avatarText}>{(item.requesterName || 'U').charAt(0).toUpperCase()}</Text>
           </View>
           <View style={styles.nameColumn}>
-            <Text style={styles.titleText}>{item.requesterName}</Text>
-            <Text style={styles.subtitleText}>→ {item.donorName}</Text>
+            <Text style={styles.titleText}>{item.requesterName || 'Unknown'}</Text>
+            <Text style={styles.subtitleText}>→ {item.donorName || 'Unknown'}</Text>
           </View>
         </View>
         <View style={styles.badge}>
@@ -110,10 +171,30 @@ export default function AdminDashboard() {
           </View>
           <View style={styles.textBox}>
             <Text style={styles.infoLabel}>Requested</Text>
-            <Text style={styles.infoText}>{new Date(item.created_at).toLocaleDateString()}</Text>
+            <Text style={styles.infoText}>{new Date(item.created_at).toLocaleDateString('en-BD', { timeZone: 'Asia/Dhaka' })}</Text>
           </View>
         </View>
       </View>
+
+      <View style={styles.statusSection}>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+          <Text style={styles.statusText}>{getStatusLabel(item.status)}</Text>
+        </View>
+        {item.status === 'pending' && (
+          <TouchableOpacity
+            style={styles.rejectButton}
+            onPress={() => handleRejectRequest(item.id)}
+          >
+            <Text style={styles.rejectButtonText}>Reject</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      {item.status === 'rejected' && item.rejection_reason && (
+        <View style={styles.rejectionReasonBox}>
+          <Text style={styles.rejectionReasonLabel}>Rejection Reason:</Text>
+          <Text style={styles.rejectionReasonText}>{item.rejection_reason}</Text>
+        </View>
+      )}
     </View>
   );
 
@@ -138,104 +219,140 @@ export default function AdminDashboard() {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <View>
                 <Text style={styles.headerTitle}>Admin Dashboard</Text>
-                <Text style={styles.headerSubtitle}>Overview and recent blood requests</Text>
+                <Text style={styles.headerSubtitle}>System statistics and overview</Text>
               </View>
             </View>
           </View>
         </LongPressGestureHandler>
 
-      <FlatList
-        data={[]}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
+      <ScrollView
         contentContainerStyle={styles.listContent}
-        scrollEnabled={true}
-        ListHeaderComponent={
-          <View>
-            {/* System Overview Card */}
-            <View style={styles.overviewCard}>
-              <View style={styles.cardHeader}>
-                <View style={styles.cardTitleContainer}>
-                  <View style={styles.iconBox}>
-                    <Shield size={moderateScale(20)} color={colors.white} />
-                  </View>
-                  <View>
-                    <Text style={styles.cardTitle}>System Overview</Text>
-                    <Text style={styles.cardSubtitle}>Live Statistics</Text>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.statsGrid}>
-                <View style={styles.statCard}>
-                  <View style={styles.statIconBox}>
-                    <Calendar size={moderateScale(24)} color={colors.primary[600]} />
-                  </View>
-                  <Text style={styles.statLabel}>Active Requests</Text>
-                  <Text style={styles.statValue}>{stats?.activeRequests ?? '0'}</Text>
-                </View>
-
-                <View style={styles.statCard}>
-                  <View style={[styles.statIconBox, { backgroundColor: '#ECFDF5' }]}>
-                    <Users size={moderateScale(24)} color='#10B981' />
-                  </View>
-                  <Text style={styles.statLabel}>Total Donors</Text>
-                  <Text style={[styles.statValue, { color: '#10B981' }]}>{stats?.totalDonors ?? '0'}</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Blood Group Distribution Card */}
-            <View style={styles.distributionCard}>
-              <View style={styles.cardHeader}>
-                <View style={styles.cardTitleContainer}>
-                  <View style={styles.iconBox}>
-                    <Droplet size={moderateScale(20)} color={colors.white} fill={colors.white} />
-                  </View>
-                  <View>
-                    <Text style={styles.cardTitle}>Blood Groups</Text>
-                    <Text style={styles.cardSubtitle}>Donor Distribution</Text>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.barsContainer}>
-                {stats && Object.keys(stats.donorsByBloodGroup).length > 0 ? (
-                  Object.entries(stats.donorsByBloodGroup).map(([bg, count], index) => {
-                    const maxCount = Math.max(...Object.values(stats.donorsByBloodGroup) as number[]);
-                    const percentage = Math.max((count / maxCount) * 100, 5);
-                    const barColors = ['#DC2626', '#F59E0B', '#10B981', '#2563EB', '#8B5CF6', '#EC4899', '#06B6D4', '#6366F1'];
-                    const barColor = barColors[index % barColors.length];
-                    return (
-                      <View key={bg} style={styles.barRow}>
-                        <View style={styles.barHeader}>
-                          <View style={[styles.bloodBadge, { backgroundColor: barColor }]}>
-                            <Text style={styles.bloodBadgeText}>{bg}</Text>
-                          </View>
-                          <Text style={styles.donorCount}>{count} donors</Text>
-                        </View>
-                        <View style={styles.barTrack}>
-                          <View style={[styles.barProgress, { width: `${percentage}%`, backgroundColor: barColor }]} />
-                        </View>
-                      </View>
-                    );
-                  })
-                ) : (
-                  <Text style={styles.emptyText}>No blood group data</Text>
-                )}
-              </View>
-            </View>
-          </View>
-        }
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Shield size={48} color="#9CA3AF" />
-            <Text style={styles.emptyText}>No requests yet</Text>
+        showsVerticalScrollIndicator={false}
+      >
+        {/* System Overview Card */}
+        <View style={styles.overviewCard}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardTitleContainer}>
+              <View style={styles.iconBox}>
+                <Shield size={moderateScale(20)} color={colors.white} />
+              </View>
+              <View>
+                <Text style={styles.cardTitle}>System Overview</Text>
+                <Text style={styles.cardSubtitle}>Live Statistics</Text>
+              </View>
+            </View>
           </View>
-        }
-      />
+
+          <View style={styles.statsGrid}>
+            <View style={styles.statCard}>
+              <View style={styles.statIconBox}>
+                <Calendar size={moderateScale(24)} color={colors.primary[600]} />
+              </View>
+              <Text style={styles.statLabel}>Active Requests</Text>
+              <Text style={styles.statValue}>{stats?.activeRequests ?? '0'}</Text>
+            </View>
+
+            <View style={styles.statCard}>
+              <View style={[styles.statIconBox, { backgroundColor: '#ECFDF5' }]}>
+                <Users size={moderateScale(24)} color='#10B981' />
+              </View>
+              <Text style={styles.statLabel}>Total Donors</Text>
+              <Text style={[styles.statValue, { color: '#10B981' }]}>{stats?.totalDonors ?? '0'}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Blood Group Distribution Card */}
+        <View style={styles.distributionCard}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardTitleContainer}>
+              <View style={styles.iconBox}>
+                <Droplet size={moderateScale(20)} color={colors.white} fill={colors.white} />
+              </View>
+              <View>
+                <Text style={styles.cardTitle}>Blood Groups</Text>
+                <Text style={styles.cardSubtitle}>Donor Distribution</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.barsContainer}>
+            {stats && Object.keys(stats.donorsByBloodGroup).length > 0 ? (
+              Object.entries(stats.donorsByBloodGroup).map(([bg, count], index) => {
+                const maxCount = Math.max(...Object.values(stats.donorsByBloodGroup) as number[]);
+                const percentage = Math.max((count / maxCount) * 100, 5);
+                const barColors = ['#DC2626', '#F59E0B', '#10B981', '#2563EB', '#8B5CF6', '#EC4899', '#06B6D4', '#6366F1'];
+                const barColor = barColors[index % barColors.length];
+                return (
+                  <View key={bg} style={styles.barRow}>
+                    <View style={styles.barHeader}>
+                      <View style={[styles.bloodBadge, { backgroundColor: barColor }]}>
+                        <Text style={styles.bloodBadgeText}>{bg}</Text>
+                      </View>
+                      <Text style={styles.donorCount}>{count} donors</Text>
+                    </View>
+                    <View style={styles.barTrack}>
+                      <View style={[styles.barProgress, { width: `${percentage}%`, backgroundColor: barColor }]} />
+                    </View>
+                  </View>
+                );
+              })
+            ) : (
+              <Text style={styles.emptyText}>No blood group data</Text>
+            )}
+          </View>
+        </View>
+      </ScrollView>
       </View>
+
+      {/* Rejection Modal */}
+      <Modal
+        visible={rejectModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setRejectModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Reject Request</Text>
+              <TouchableOpacity onPress={() => setRejectModalVisible(false)}>
+                <X size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalLabel}>Rejection Reason</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Enter reason for rejection..."
+              value={rejectionReason}
+              onChangeText={setRejectionReason}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => {
+                  setRejectModalVisible(false);
+                  setRejectionReason('');
+                }}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSubmitButton}
+                onPress={submitRejection}
+              >
+                <Text style={styles.modalSubmitButtonText}>Reject</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -662,5 +779,120 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 12,
     marginTop: 8,
+  },
+  statusSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  statusText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  rejectButton: {
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  rejectButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  rejectionReasonBox: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  rejectionReasonLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  rejectionReasonText: {
+    fontSize: 12,
+    color: '#991B1B',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    minHeight: 100,
+    marginBottom: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancelButton: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalCancelButtonText: {
+    color: '#6B7280',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  modalSubmitButton: {
+    flex: 1,
+    backgroundColor: '#DC2626',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalSubmitButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
   },
 });

@@ -93,6 +93,13 @@ const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
   const loadProfile = async () => {
     try {
       const donorProfile = await DonorService.getProfile();
+      
+      // Check if user is banned
+      if (donorProfile.status === 'suspended') {
+        router.replace('/banned');
+        return;
+      }
+      
       setProfile(donorProfile);
       setFormData({
         name: donorProfile.name,
@@ -440,7 +447,7 @@ const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
             )}
             {profile.last_donation_date && (
               <Text style={styles.lastDonationText}>
-                Last: {new Date(profile.last_donation_date).toLocaleDateString()} • 90 days between donations
+                Last: {new Date(profile.last_donation_date).toLocaleDateString('en-BD', { timeZone: 'Asia/Dhaka' })} • 90 days between donations
               </Text>
             )}
 
@@ -705,7 +712,7 @@ const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
                 >
                   <Calendar size={20} color="#6B7280" />
                   <Text style={styles.modalDateText}>
-                    {donationDate.toLocaleDateString()}
+                    {donationDate.toLocaleDateString('en-BD', { timeZone: 'Asia/Dhaka' })}
                   </Text>
                 </TouchableOpacity>
               </View>

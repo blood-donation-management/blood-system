@@ -1,7 +1,34 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { Heart, Search, User, Sparkles } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import { DonorService } from '@/services/DonorService';
 
 export default function TabLayout() {
+  const router = useRouter();
+  const [checkingBan, setCheckingBan] = useState(true);
+
+  useEffect(() => {
+    checkBanStatus();
+  }, []);
+
+  const checkBanStatus = async () => {
+    try {
+      const profile = await DonorService.getProfile();
+      if (profile.status === 'suspended') {
+        router.replace('/banned');
+        return;
+      }
+    } catch (error) {
+      console.error('Failed to check ban status:', error);
+    } finally {
+      setCheckingBan(false);
+    }
+  };
+
+  if (checkingBan) {
+    return null; // Or a loading screen
+  }
+
   return (
     <Tabs
       screenOptions={{

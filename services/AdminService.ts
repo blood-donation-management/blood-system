@@ -47,7 +47,9 @@ export class AdminService {
 
       const admin = admins[0];
       
-      // Compare hashed password using bcrypt (optimized - removed test hash)
+      // Compare hashed password using bcrypt
+      // Note: This is the slowest operation (100-300ms on mobile)
+      // Password hashes should use 8 bcrypt rounds for optimal mobile performance
       const isPasswordValid = await bcrypt.compare(password, admin.password);
       
       if (!isPasswordValid) {
@@ -152,6 +154,27 @@ export class AdminService {
 
     const { data, error } = await query;
     if (error) throw new Error('Failed to fetch donors: ' + error.message);
+    
+    // Check which donors have accepted requests
+    if (data && data.length > 0) {
+      const donorIds = data.map(d => d.id);
+      const { data: acceptedRequests } = await supabase
+        .from('blood_requests')
+        .select('donor_id')
+        .in('donor_id', donorIds)
+        .eq('status', 'accepted');
+
+      const donorsWithAcceptedRequests = new Set(
+        (acceptedRequests || []).map(r => r.donor_id)
+      );
+
+      // Add hasAcceptedRequest flag to each donor
+      return data.map(donor => ({
+        ...donor,
+        hasAcceptedRequest: donorsWithAcceptedRequests.has(donor.id)
+      }));
+    }
+
     return data ?? [];
   }
 
@@ -241,6 +264,55 @@ export class AdminService {
     return { success: true };
   }
 
+  static async completeRequest(requestId: string, donorId: string) {
+    try {
+      // Update request status to completed
+      const { error: updateError } = await supabase
+        .from('blood_requests')
+        .update({ 
+          status: 'completed',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', requestId);
+
+      if (updateError) throw new Error('Failed to complete request: ' + updateError.message);
+
+      // Update donor's last_donation_date
+      const { error: donorError } = await supabase
+        .from('donors')
+        .update({ last_donation_date: new Date().toISOString() })
+        .eq('id', donorId);
+
+      if (donorError) {
+        console.error('Failed to update donor last donation date:', donorError);
+        // Don't throw error here, the main update succeeded
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to complete request');
+    }
+  }
+
+  static async rejectRequest(requestId: string, rejectionReason: string) {
+    try {
+      const { error } = await supabase
+        .from('blood_requests')
+        .update({ 
+          status: 'rejected',
+          rejection_reason: rejectionReason,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', requestId);
+
+      if (error) throw new Error('Failed to reject request: ' + error.message);
+
+      return { success: true };
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to reject request');
+    }
+  }
+
   // User Reports Management
   static async getUserReports(status?: string) {
     let query = supabase
@@ -257,7 +329,9 @@ export class AdminService {
           email,
           phone_number,
           blood_group,
-          location
+          location,
+          status,
+          ban_expiry
         )
       `)
       .order('created_at', { ascending: false });
@@ -273,10 +347,14 @@ export class AdminService {
       ...report,
       reporterName: report.reporter?.name || 'Unknown',
       reporterEmail: report.reporter?.email || 'N/A',
+      reporterPhone: report.reporter?.phone_number || '',
       reportedUserName: report.reported_user?.name || 'Unknown',
       reportedUserEmail: report.reported_user?.email || 'N/A',
+      reportedUserPhone: report.reported_user?.phone_number || '',
       reportedUserBloodGroup: report.reported_user?.blood_group || 'N/A',
-      reportedUserLocation: report.reported_user?.location || 'N/A'
+      reportedUserLocation: report.reported_user?.location || 'N/A',
+      reportedUserStatus: report.reported_user?.status || 'active',
+      reportedUserBanExpiry: report.reported_user?.ban_expiry || null
     }));
   }
 
@@ -298,5 +376,52 @@ export class AdminService {
 
     if (error) throw new Error('Failed to update report status: ' + error.message);
     return data;
+  }
+
+  static async banUser(userId: string, days?: number) {
+    try {
+      let banExpiry = null;
+      
+      if (days && days > 0) {
+        // Temporary ban - calculate expiry date
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + days);
+        banExpiry = expiryDate.toISOString();
+      }
+      
+      const { error } = await supabase
+        .from('donors')
+        .update({ 
+          status: 'suspended',
+          ban_expiry: banExpiry,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+
+      if (error) throw new Error('Failed to ban user: ' + error.message);
+
+      return { success: true };
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to ban user');
+    }
+  }
+
+  static async unbanUser(userId: string) {
+    try {
+      const { error } = await supabase
+        .from('donors')
+        .update({ 
+          status: 'active',
+          ban_expiry: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+
+      if (error) throw new Error('Failed to unban user: ' + error.message);
+
+      return { success: true };
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to unban user');
+    }
   }
 }

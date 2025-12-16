@@ -190,10 +190,26 @@ export class DonorService {
       const { data, error } = await query;
       if (error) throw new Error('Failed to search donors: ' + error.message);
       
+      // Check which donors have accepted requests
+      let donorsWithAcceptedRequests = new Set<string>();
+      if (data && data.length > 0) {
+        const donorIds = data.map(d => d.id);
+        const { data: acceptedRequests } = await supabase
+          .from('blood_requests')
+          .select('donor_id')
+          .in('donor_id', donorIds)
+          .eq('status', 'accepted');
+
+        donorsWithAcceptedRequests = new Set(
+          (acceptedRequests || []).map(r => r.donor_id)
+        );
+      }
+
       // Map database fields to camelCase for frontend
       return (data || []).map((donor: any) => ({
         ...donor,
         lastDonationDate: donor.last_donation_date,
+        hasAcceptedRequest: donorsWithAcceptedRequests.has(donor.id),
       }));
     } catch (error: any) {
       throw new Error(error.message || 'Unable to search donors. Please try again.');
@@ -211,17 +227,52 @@ export class DonorService {
 
       const displayName = (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name)) || user.email || 'Unknown';
 
-      // Lookup donor name for legacy NOT NULL columns
+      // Lookup donor info and check status
       const { data: donorRow, error: donorErr } = await supabase
         .from('donors')
-        .select('name,email,blood_group,location,phone_number')
+        .select('name,email,blood_group,location,phone_number,status,last_donation_date')
         .eq('id', donorId)
         .maybeSingle();
       if (donorErr) throw new Error('Failed to fetch donor: ' + donorErr.message);
-      const donorName = (donorRow && donorRow.name) || (donorRow && donorRow.email) || 'Unknown Donor';
-      const donorBloodGroup = donorRow?.blood_group || 'Unknown';
-      const donorLocation = donorRow?.location || null;
-      const donorPhone = donorRow?.phone_number || null;
+      
+      if (!donorRow) {
+        throw new Error('Donor not found.');
+      }
+
+      // Check if donor is suspended
+      if (donorRow.status === 'suspended') {
+        throw new Error('This donor is currently suspended and cannot receive requests.');
+      }
+
+      // Check if donor already has an accepted request
+      const { data: existingAccepted, error: checkError } = await supabase
+        .from('blood_requests')
+        .select('id, status')
+        .eq('donor_id', donorId)
+        .eq('status', 'accepted')
+        .limit(1);
+
+      if (checkError) {
+        console.error('Error checking donor requests:', checkError);
+      } else if (existingAccepted && existingAccepted.length > 0) {
+        throw new Error('This donor already has an accepted request. Please wait until they complete it.');
+      }
+
+      // Check donor eligibility (90-day rule)
+      if (donorRow.last_donation_date) {
+        const lastDonation = new Date(donorRow.last_donation_date);
+        const daysSinceLastDonation = Math.floor((Date.now() - lastDonation.getTime()) / (1000 * 60 * 60 * 24));
+        const daysUntilEligible = 90 - daysSinceLastDonation;
+        
+        if (daysUntilEligible > 0) {
+          throw new Error(`This donor is not eligible yet. They will be available in ${daysUntilEligible} days (${Math.ceil(daysUntilEligible / 30)} months after last donation).`);
+        }
+      }
+
+      const donorName = donorRow.name || donorRow.email || 'Unknown Donor';
+      const donorBloodGroup = donorRow.blood_group || 'Unknown';
+      const donorLocation = donorRow.location || null;
+      const donorPhone = donorRow.phone_number || null;
 
       const { data, error } = await supabase
         .from('blood_requests')
@@ -325,6 +376,50 @@ export class DonorService {
         throw new Error('Invalid request ID');
       }
 
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error('Please log in to accept requests.');
+      }
+
+      // Check if donor has any active (accepted) requests
+      // Temporarily disabled for testing - uncomment after testing
+      /*
+      const { data: existingAccepted, error: checkError } = await supabase
+        .from('blood_requests')
+        .select('id, status')
+        .eq('donor_id', user.id)
+        .eq('status', 'accepted')
+        .limit(1);
+
+      if (checkError) {
+        console.error('Error checking existing requests:', checkError);
+        throw new Error('Unable to verify request status. Please try again.');
+      }
+
+      if (existingAccepted && existingAccepted.length > 0) {
+        throw new Error('You already have an accepted request. Please complete it before accepting another.');
+      }
+      */
+
+      // Check donor's availability status (not suspended/banned)
+      const profile = await this.getProfile();
+      if (profile.status === 'suspended') {
+        throw new Error('Your account is suspended. You cannot accept requests.');
+      }
+
+      // Check if donor is eligible (90-day rule)
+      if (profile.last_donation_date) {
+        const lastDonation = new Date(profile.last_donation_date);
+        const daysSinceLastDonation = Math.floor((Date.now() - lastDonation.getTime()) / (1000 * 60 * 60 * 24));
+        const daysUntilEligible = 90 - daysSinceLastDonation;
+        
+        if (daysUntilEligible > 0) {
+          throw new Error(`You are not eligible to donate yet. Please wait ${daysUntilEligible} more days (${Math.ceil(daysUntilEligible / 30)} months after last donation).`);
+        }
+      }
+
+      // Accept the request
       const { data, error } = await supabase
         .from('blood_requests')
         .update({ 

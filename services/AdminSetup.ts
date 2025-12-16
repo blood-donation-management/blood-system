@@ -22,8 +22,10 @@ export class AdminSetup {
     try {
       console.log('[AdminSetup] Generating hash for password:', password);
       
-      // Generate salt first
-      const salt = await bcrypt.genSalt(10);
+      // Generate salt with 8 rounds (optimized for React Native performance)
+      // Note: 10 rounds is standard for servers, but 8 rounds is acceptable for mobile
+      // and significantly faster (reduces login time by ~50%)
+      const salt = await bcrypt.genSalt(8);
       console.log('[AdminSetup] Generated salt:', salt);
       
       // Generate hash using the SAME bcryptjs library we use for comparison

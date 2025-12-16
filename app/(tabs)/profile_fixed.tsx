@@ -238,7 +238,7 @@ export default function Profile() {
             )}
             {profile.lastDonationDate && (
               <Text style={styles.lastDonationText}>
-                Last donation: {new Date(profile.lastDonationDate).toLocaleDateString()}
+                Last donation: {new Date(profile.lastDonationDate).toLocaleDateString('en-BD', { timeZone: 'Asia/Dhaka' })}
               </Text>
             )}
           </View>

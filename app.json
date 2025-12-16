@@ -2,21 +2,21 @@
   "expo": {
     "name": "Blood Donation",
     "slug": "blooddonation",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/blood-donation.png",
+    "icon": "./assets/images/Blood Donation Logo.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/blood-donation.png",
+      "image": "./assets/images/Blood Donation Logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "android": {
       "package": "com.blooddonation.app",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/blood-donation.png",
+        "foregroundImage": "./assets/images/Blood Donation Logo.png",
         "backgroundColor": "#ffffff"
       },
       "usesCleartextTraffic": true

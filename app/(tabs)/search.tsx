@@ -340,7 +340,51 @@ export default function SearchDonors() {
               style={[styles.adminButton, styles.verifyButton]}
               onPress={async () => {
                 try {
-                  const { AdminService } = await import('@/services/AdminService');\n                  await AdminService.verifyDonor(item.id, true, 'Verified by admin');\n                  Alert.alert('Success', 'Donor verified successfully');\n                  searchDonors();\n                } catch (e: any) {\n                  Alert.alert('Error', e.message || 'Failed to verify donor');\n                }\n              }}\n            >\n              <CheckCircle size={14} color=\"#FFFFFF\" />\n              <Text style={styles.adminButtonText}>Verify</Text>\n            </TouchableOpacity>\n            <TouchableOpacity\n              style={[styles.adminButton, styles.deleteButton]}\n              onPress={() => {\n                Alert.alert(\n                  'Delete Donor',\n                  `Are you sure you want to delete ${item.name}?`,\n                  [\n                    { text: 'Cancel', style: 'cancel' },\n                    {\n                      text: 'Delete',\n                      style: 'destructive',\n                      onPress: async () => {\n                        try {\n                          const { AdminService } = await import('@/services/AdminService');\n                          await AdminService.deleteDonor(item.id);\n                          Alert.alert('Success', 'Donor deleted successfully');\n                          searchDonors();\n                        } catch (e: any) {\n                          Alert.alert('Error', e.message || 'Failed to delete donor');\n                        }\n                      },\n                    },\n                  ]\n                );\n              }}\n            >\n              <Text style={styles.adminButtonText}>🗑️ Delete</Text>\n            </TouchableOpacity>\n          </View>\n        )}\n      </View>\n    </View>\n  );
+                  const { AdminService } = await import('@/services/AdminService');
+                  await AdminService.verifyDonor(item.id, true, 'Verified by admin');
+                  Alert.alert('Success', 'Donor verified successfully');
+                  searchDonors();
+                } catch (e: any) {
+                  Alert.alert('Error', e.message || 'Failed to verify donor');
+                }
+              }}
+            >
+              <CheckCircle size={14} color="#FFFFFF" />
+              <Text style={styles.adminButtonText}>Verify</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.adminButton, styles.deleteButton]}
+              onPress={() => {
+                Alert.alert(
+                  'Delete Donor',
+                  `Are you sure you want to delete ${item.name}?`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          const { AdminService } = await import('@/services/AdminService');
+                          await AdminService.deleteDonor(item.id);
+                          Alert.alert('Success', 'Donor deleted successfully');
+                          searchDonors();
+                        } catch (e: any) {
+                          Alert.alert('Error', e.message || 'Failed to delete donor');
+                        }
+                      },
+                    },
+                  ]
+                );
+              }}
+            >
+              <Text style={styles.adminButtonText}>🗑️ Delete</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    </View>
+  );
 
   return (
     <View style={styles.container}>

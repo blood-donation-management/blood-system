@@ -42,6 +42,11 @@ export default function NotificationsScreen() {
 
   useEffect(() => {
     loadNotifications();
+    // Real-time auto-refresh every 3 seconds
+    const interval = setInterval(() => {
+      loadNotifications();
+    }, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   const onRefresh = useCallback(() => {

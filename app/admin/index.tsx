@@ -77,26 +77,42 @@ export default function AdminDashboard() {
 
   const renderItem = ({ item }: { item: BloodRequest }) => (
     <View style={styles.card}>
+      <View style={styles.cardGradient} />
       <View style={styles.cardHeader}>
         <View style={styles.titleRow}>
-          <Users size={18} color="#DC2626" />
-          <Text style={styles.titleText}>
-            {item.requesterName} <Text style={styles.mutedText}>→</Text> {item.donorName}
-          </Text>
+          <View style={styles.avatarCircle}>
+            <Text style={styles.avatarText}>{item.requesterName.charAt(0).toUpperCase()}</Text>
+          </View>
+          <View style={styles.nameColumn}>
+            <Text style={styles.titleText}>{item.requesterName}</Text>
+            <Text style={styles.subtitleText}>→ {item.donorName}</Text>
+          </View>
         </View>
         <View style={styles.badge}>
-          <Droplet size={16} color="#FFFFFF" />
+          <Droplet size={16} color="#FFFFFF" fill="#FFFFFF" />
           <Text style={styles.badgeText}>{item.blood_group}</Text>
         </View>
       </View>
 
-      <View style={styles.infoRow}>
-        <MapPin size={16} color="#6B7280" />
-        <Text style={styles.infoText}>{item.location}</Text>
-      </View>
-      <View style={styles.infoRow}>
-        <Calendar size={16} color="#6B7280" />
-        <Text style={styles.infoText}>{new Date(item.created_at).toLocaleString()}</Text>
+      <View style={styles.infoGrid}>
+        <View style={styles.infoRow}>
+          <View style={styles.iconBox}>
+            <MapPin size={16} color="#DC2626" />
+          </View>
+          <View style={styles.textBox}>
+            <Text style={styles.infoLabel}>Location</Text>
+            <Text style={styles.infoText}>{item.location}</Text>
+          </View>
+        </View>
+        <View style={styles.infoRow}>
+          <View style={styles.iconBox}>
+            <Calendar size={16} color="#DC2626" />
+          </View>
+          <View style={styles.textBox}>
+            <Text style={styles.infoLabel}>Requested</Text>
+            <Text style={styles.infoText}>{new Date(item.created_at).toLocaleDateString()}</Text>
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -335,8 +351,60 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     borderLeftWidth: 4,
-    borderLeftColor: '#DC2626',
+    borderLeftColor: '#DC2626',    overflow: 'hidden',
   },
+  cardGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '35%',
+    backgroundColor: '#FEF2F2',
+  },
+  avatarCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#DC2626',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  nameColumn: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  subtitleText: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  infoGrid: {
+    gap: 12,
+    marginTop: 12,
+  },
+  iconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#FEF2F2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  textBox: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  infoLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,  },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -39,6 +39,7 @@ export default function SearchDonors() {
   const [isLoading, setIsLoading] = useState(false);
   const [pickerVisible, setPickerVisible] = useState<'city' | 'area' | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Animation refs
   const searchButtonScale = useRef(new Animated.Value(1)).current;
@@ -50,10 +51,33 @@ export default function SearchDonors() {
     startAnimations();
   }, []);
 
-  // Load all donors initially without filters
+  // Load all donors initially without filters and check if admin
   useEffect(() => {
+    checkAdminStatus();
     searchDonors();
+    // Real-time refresh every 3 seconds
+    const interval = setInterval(() => {
+      searchDonors();
+    }, 3000);
+    return () => clearInterval(interval);
   }, []);
+
+  const checkAdminStatus = async () => {
+    try {
+      const { supabase } = await import('@/config/supabase');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: admin } = await supabase
+          .from('admins')
+          .select('id')
+          .eq('id', user.id)
+          .single();
+        setIsAdmin(!!admin);
+      }
+    } catch (e) {
+      setIsAdmin(false);
+    }
+  };
 
   const startAnimations = () => {
     // Glow animation for search button
@@ -308,9 +332,15 @@ export default function SearchDonors() {
           <MessageCircle size={16} color="#FFFFFF" />
           <Text style={styles.whatsappButtonText}>Message on WhatsApp</Text>
         </TouchableOpacity>
-      </View>
-    </View>
-  );
+        
+        {/* Admin Controls */}
+        {isAdmin && (
+          <View style={styles.adminControls}>
+            <TouchableOpacity
+              style={[styles.adminButton, styles.verifyButton]}
+              onPress={async () => {
+                try {
+                  const { AdminService } = await import('@/services/AdminService');\n                  await AdminService.verifyDonor(item.id, true, 'Verified by admin');\n                  Alert.alert('Success', 'Donor verified successfully');\n                  searchDonors();\n                } catch (e: any) {\n                  Alert.alert('Error', e.message || 'Failed to verify donor');\n                }\n              }}\n            >\n              <CheckCircle size={14} color=\"#FFFFFF\" />\n              <Text style={styles.adminButtonText}>Verify</Text>\n            </TouchableOpacity>\n            <TouchableOpacity\n              style={[styles.adminButton, styles.deleteButton]}\n              onPress={() => {\n                Alert.alert(\n                  'Delete Donor',\n                  `Are you sure you want to delete ${item.name}?`,\n                  [\n                    { text: 'Cancel', style: 'cancel' },\n                    {\n                      text: 'Delete',\n                      style: 'destructive',\n                      onPress: async () => {\n                        try {\n                          const { AdminService } = await import('@/services/AdminService');\n                          await AdminService.deleteDonor(item.id);\n                          Alert.alert('Success', 'Donor deleted successfully');\n                          searchDonors();\n                        } catch (e: any) {\n                          Alert.alert('Error', e.message || 'Failed to delete donor');\n                        }\n                      },\n                    },\n                  ]\n                );\n              }}\n            >\n              <Text style={styles.adminButtonText}>🗑️ Delete</Text>\n            </TouchableOpacity>\n          </View>\n        )}\n      </View>\n    </View>\n  );
 
   return (
     <View style={styles.container}>
@@ -815,6 +845,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#EFF6FF',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  adminControls: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[100],
+  },
+  adminButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    ...shadows.sm,
+  },
+  verifyButton: {
+    backgroundColor: '#10B981',
+  },
+  deleteButton: {
+    backgroundColor: '#EF4444',
+  },
+  adminButtonText: {
+    color: colors.white,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
   },
   whatsappButton: {
     flexDirection: 'row',

@@ -590,6 +590,7 @@ export default function ReportsScreen() {
           </View>
         </View>
       </Modal>
+      </View>
     </View>
   );
 }

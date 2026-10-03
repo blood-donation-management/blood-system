@@ -159,7 +159,7 @@ export default function Motivation() {
           </View>
 
           <Text style={styles.benefitText}>
-            Regular blood donation isn't just altruistic—it also benefits your own health:
+            Regular blood donation isn&apos;t just altruistic—it also benefits your own health:
           </Text>
 
           <View style={styles.healthBenefitsList}>
@@ -190,7 +190,7 @@ export default function Motivation() {
             <View style={styles.healthBenefitItem}>
               <View style={styles.bulletPoint} />
               <Text style={styles.healthBenefitText}>
-                <Text style={styles.boldText}>Emotional Well-being:</Text> Feel good knowing you've saved lives
+                <Text style={styles.boldText}>Emotional Well-being:</Text> Feel good knowing you&apos;ve saved lives
               </Text>
             </View>
           </View>

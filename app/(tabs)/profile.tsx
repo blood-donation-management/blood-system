@@ -447,7 +447,7 @@ const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
             )}
             {profile.last_donation_date && (
               <Text style={styles.lastDonationText}>
-                Last: {new Date(profile.last_donation_date).toLocaleDateString('en-BD', { timeZone: 'Asia/Dhaka' })} • 90 days between donations
+                Last: {new Date(profile.last_donation_date).toLocaleDateString('en-BD', { timeZone: 'Asia/Dhaka' })} â€¢ 90 days between donations
               </Text>
             )}
 
@@ -780,7 +780,7 @@ const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
               {/* Info Box */}
               <View style={styles.infoBox}>
                 <Text style={styles.infoBoxText}>
-                  Recording a donation will update your eligibility status. You'll be eligible to donate again after 90 days.
+                  Recording a donation will update your eligibility status. You&apos;ll be eligible to donate again after 90 days.
                 </Text>
               </View>
             </ScrollView>
@@ -1143,16 +1143,6 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     marginTop: spacing['2xl'],
-  },
-  editButton: {
-    backgroundColor: colors.primary[600],
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.lg,
-    borderRadius: borderRadius.xl,
-    gap: spacing.sm,
-    ...shadows.md,
   },
   editButtonText: {
     color: colors.white,

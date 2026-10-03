@@ -219,7 +219,7 @@ export default function Login() {
                 style={styles.buttonContent}
               >
                 <Text style={styles.signupButtonText}>
-                  Don't have an account?{'\n'}
+                  Don&apos;t have an account?{'\n'}
                   <Text style={styles.signupButtonHighlight}>Sign Up Here</Text>
                 </Text>
               </TouchableOpacity>

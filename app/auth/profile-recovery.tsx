@@ -141,7 +141,7 @@ function ProfileRecovery() {
           <View style={styles.warningTextBox}>
             <Text style={styles.warningTitle}>Profile Missing</Text>
             <Text style={styles.warningText}>
-              Use this screen if you're getting a "Cannot coerce to single JSON object" error. 
+              Use this screen if you&apos;re getting a &quot;Cannot coerce to single JSON object&quot; error. 
               This will create your missing donor profile.
             </Text>
           </View>

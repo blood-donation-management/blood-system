@@ -385,7 +385,7 @@ export default function RequestsScreen() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Cancel Request</Text>
             <Text style={styles.modalSubtitle}>
-              Add a reason why you're canceling (optional)
+              Add a reason why you&apos;re canceling (optional)
             </Text>
             <TextInput
               placeholder="Reason (optional)"

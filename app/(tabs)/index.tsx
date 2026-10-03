@@ -214,7 +214,7 @@ export default function Dashboard() {
     router.push('/(tabs)/requests');
   };
 
-  // Messages feature removed — no messages handler here
+  // Messages feature removed â€” no messages handler here
 
   // Redirect unauthenticated users to login instead of showing a Get Started page
   useEffect(() => {
@@ -410,7 +410,7 @@ export default function Dashboard() {
             <Text style={styles.actionTitle}>Find Donors</Text>
             <Text style={styles.actionSubtitle}>Search by blood type & location</Text>
           </View>
-          <Text style={styles.actionArrow}>→</Text>
+          <Text style={styles.actionArrow}>â†’</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -425,7 +425,7 @@ export default function Dashboard() {
             <Text style={styles.actionTitle}>My History</Text>
             <Text style={styles.actionSubtitle}>View donation records</Text>
           </View>
-          <Text style={styles.actionArrow}>→</Text>
+          <Text style={styles.actionArrow}>â†’</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -447,7 +447,7 @@ export default function Dashboard() {
             <Text style={styles.actionTitle}>Requests</Text>
             <Text style={styles.actionSubtitle}>Manage blood requests</Text>
           </View>
-          <Text style={styles.actionArrow}>→</Text>
+          <Text style={styles.actionArrow}>â†’</Text>
         </TouchableOpacity>
       </View>
 
@@ -1130,12 +1130,5 @@ const styles = StyleSheet.create({
   unknownSubtitle: {
     fontSize: 12,
     color: '#6B7280',
-  },
-  lastDonationText: {
-    fontSize: 11,
-    color: '#6B7280',
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginTop: 12,
   },
 });

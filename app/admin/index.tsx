@@ -643,13 +643,6 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
   },
-  infoLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
   infoValue: {
     fontSize: 15,
     fontWeight: '700',
@@ -667,21 +660,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     ...shadows.md,
   },
-  cardHeader: {
-    marginBottom: spacing.lg,
-  },
   cardTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-  },
-  iconBox: {
-    width: moderateScale(40),
-    height: moderateScale(40),
-    borderRadius: moderateScale(12),
-    backgroundColor: colors.primary[600],
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   cardTitle: {
     fontSize: fontSize.lg,
@@ -698,13 +680,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
   },
-  statCard: {
-    flex: 1,
-    backgroundColor: colors.gray[50],
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    alignItems: 'center',
-  },
   statIconBox: {
     width: moderateScale(48),
     height: moderateScale(48),
@@ -713,19 +688,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.sm,
-  },
-  statLabel: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    color: colors.gray[500],
-    textTransform: 'uppercase',
-    marginBottom: spacing.xs,
-    textAlign: 'center',
-  },
-  statValue: {
-    fontSize: fontSize['3xl'],
-    fontWeight: '900',
-    color: colors.primary[600],
   },
   distributionCard: {
     backgroundColor: colors.white,

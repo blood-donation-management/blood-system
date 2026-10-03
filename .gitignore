@@ -20,3 +20,7 @@ test.jpg
 
 expo-env.d.ts
 # @end expo-cli
+# Backend environment files
+backend/.env
+backend/.env.local
+backend/.env.*
